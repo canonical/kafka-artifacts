@@ -51,7 +51,9 @@ def root_available():
 
 
 pytestmark = [
-    pytest.mark.skipif(not snap_installed(), reason=f"the {SNAP} snap is not installed"),
+    pytest.mark.skipif(
+        not snap_installed(), reason=f"the {SNAP} snap is not installed"
+    ),
     pytest.mark.skipif(
         not root_available(),
         reason="needs passwordless sudo: snap get/set and server.properties are root owned",
@@ -72,7 +74,9 @@ def snap_get():
 
 def snap_set(*assignments):
     return subprocess.run(
-        ["sudo", "-n", "snap", "set", SNAP, *assignments], capture_output=True, text=True
+        ["sudo", "-n", "snap", "set", SNAP, *assignments],
+        capture_output=True,
+        text=True,
     )
 
 
@@ -89,6 +93,17 @@ def write_as_root(path, content):
         stdout=subprocess.DEVNULL,
         check=True,
     )
+
+
+def read_as_root(path) -> bytes:
+    """Reads a root-owned file the way write_as_root writes one; config is 770 _daemon_:root."""
+    return subprocess.run(
+        ["sudo", "-n", "cat", str(path)], capture_output=True, check=True
+    ).stdout
+
+
+def exists_as_root(path) -> bool:
+    return subprocess.run(["sudo", "-n", "test", "-e", str(path)]).returncode == 0
 
 
 def config_options():
@@ -114,24 +129,24 @@ def read_prop(text, key):
 
 
 def rendered():
-    return LIVE_CONF.read_text()
+    return read_as_root(LIVE_CONF).decode()
 
 
 def recorded_state():
-    if not LIVE_STATE.exists():
+    if not exists_as_root(LIVE_STATE):
         return ""
-    return LIVE_STATE.read_text()
+    return read_as_root(LIVE_STATE).decode()
 
 
 def log_lines():
-    if not LIVE_LOG.exists():
+    if not exists_as_root(LIVE_LOG):
         return []
-    return LIVE_LOG.read_text().splitlines()
+    return read_as_root(LIVE_LOG).decode().splitlines()
 
 
 def edit_conf(key, value):
     """Stands in for an administrator editing server.properties by hand."""
-    lines = LIVE_CONF.read_text().splitlines()
+    lines = read_as_root(LIVE_CONF).decode().splitlines()
     out, done = [], False
     for line in lines:
         stripped = line.lstrip("#").strip()
@@ -149,8 +164,8 @@ def edit_conf(key, value):
 def restored():
     """Puts the snap back exactly as it was found (server.properties restored before and after the options)."""
     options = snap_get()
-    conf = LIVE_CONF.read_bytes()
-    state = LIVE_STATE.read_bytes() if LIVE_STATE.exists() else None
+    conf = read_as_root(LIVE_CONF)
+    state = read_as_root(LIVE_STATE) if exists_as_root(LIVE_STATE) else None
 
     def restore_files():
         write_as_root(LIVE_CONF, conf)
@@ -191,7 +206,9 @@ def test_every_supported_option_is_rendered():
 
     document = rendered()
     for option, value in OPTION_VALUES.items():
-        assert read_prop(document, mapping[option]) == value, f"{option} was not rendered"
+        assert (
+            read_prop(document, mapping[option]) == value
+        ), f"{option} was not rendered"
 
 
 def test_setting_the_same_value_again_changes_nothing():
@@ -201,7 +218,7 @@ def test_setting_the_same_value_again_changes_nothing():
 
     assert snap_set("num-partitions=3").returncode == 0
 
-    new_lines = log_lines()[len(before):]
+    new_lines = log_lines()[len(before) :]
     assert not [line for line in new_lines if "setting num.partitions" in line]
     assert not [line for line in new_lines if "snap restart" in line]
 
@@ -216,22 +233,22 @@ def test_unsupported_option_is_rejected_and_rolled_back():
 
 
 def test_unsupported_option_is_rejected_before_writing():
-    before = LIVE_CONF.read_bytes()
+    before = read_as_root(LIVE_CONF)
 
     result = snap_set("num-network-threads=4", "num-partitions=3")
 
     assert result.returncode != 0
-    assert LIVE_CONF.read_bytes() == before
+    assert read_as_root(LIVE_CONF) == before
 
 
 def test_option_naming_no_kafka_key_is_accepted():
     """A name matching no server.properties key is invisible to the hook, so snapd just stores it."""
-    before = LIVE_CONF.read_bytes()
+    before = read_as_root(LIVE_CONF)
 
     result = snap_set("definitely-not-a-kafka-option=1")
 
     assert result.returncode == 0, result.stderr
-    assert LIVE_CONF.read_bytes() == before
+    assert read_as_root(LIVE_CONF) == before
 
 
 def test_hand_edit_blocks_the_option():
@@ -258,7 +275,7 @@ def test_hand_edit_of_a_rendered_key_is_kept():
     assert result.returncode == 0, result.stderr
     assert read_prop(rendered(), "num.partitions") == "9"
 
-    new_lines = "\n".join(log_lines()[len(before):])
+    new_lines = "\n".join(log_lines()[len(before) :])
     assert "ignoring the 'num-partitions' option" in new_lines
 
 
