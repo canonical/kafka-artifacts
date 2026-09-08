@@ -1,0 +1,553 @@
+name: kafka
+base: core26
+version: '4.3.1'
+
+summary: Apache Kafka in a snap.
+description: |
+  A standalone snap for Apache Kafka, a distributed event streaming
+  platform.
+
+grade: stable
+confinement: strict
+
+# The headless java-slim runtime is jlinked without the X11/desktop/sound modules, so the
+# library linter's missing/unused-dependency warnings for its .so files are expected noise.
+lint:
+  ignore:
+    - library:
+        - usr/lib/jvm/java-slim/**
+
+title: Apache Kafka
+website: https://kafka.apache.org
+contact: https://github.com/canonical/kafka-snap/issues
+issues: https://github.com/canonical/kafka-snap/issues
+source-code: https://github.com/canonical/kafka-snap
+license: Apache-2.0
+
+platforms:
+  amd64:
+  arm64:
+
+system-usernames:
+  _daemon_: shared
+
+environment:
+  # java-slim: arch-independent symlink to the bundled OpenJDK 21 JRE, so JAVA_HOME need not name an arch.
+  JAVA_HOME: ${SNAP}/usr/lib/jvm/java-slim
+  KAFKA_HOME: ${SNAP}/opt/kafka
+  PATH: ${SNAP}/opt/kafka/bin:${SNAP}/usr/lib/jvm/java-slim/bin:${SNAP}/usr/bin:${PATH}
+
+slots:
+  # Optional: lets a companion snap read the broker logs over a content interface.
+  logs:
+    interface: content
+    source:
+      read:
+        - $SNAP_COMMON/var/log/kafka
+
+hooks:
+  install:
+    plugs:
+      - network
+      - network-bind
+      - mount-observe
+  configure:
+    plugs:
+      - network
+      - network-bind
+      - mount-observe
+
+apps:
+  # kafka-server-start/stop.sh are NOT tools: the "server" daemon owns the broker lifecycle (install-mode: enable).
+  server:
+    command: opt/kafka/bin/start-wrapper.bash
+    daemon: simple
+    install-mode: enable
+    aliases:
+      - kafka-server
+    plugs:
+      - network
+      - network-bind
+      - mount-observe
+      - removable-media
+    environment:
+      LOG_DIR: $SNAP_COMMON/var/log/kafka
+
+  # Broker tools: every upstream bin/*.sh, aliased to its basename (".sh" stripped), run through bin-wrapper.bash.
+  kafka-acls:
+    command: opt/kafka/bin/bin-wrapper.bash
+    aliases:
+      - kafka-acls
+    plugs:
+      - network
+      - network-bind
+      - mount-observe
+      - home
+    environment:
+      bin_script: kafka-acls.sh
+  kafka-broker-api-versions:
+    command: opt/kafka/bin/bin-wrapper.bash
+    aliases:
+      - kafka-broker-api-versions
+    plugs:
+      - network
+      - network-bind
+      - mount-observe
+      - home
+    environment:
+      bin_script: kafka-broker-api-versions.sh
+  kafka-client-metrics:
+    command: opt/kafka/bin/bin-wrapper.bash
+    aliases:
+      - kafka-client-metrics
+    plugs:
+      - network
+      - network-bind
+      - mount-observe
+      - home
+    environment:
+      bin_script: kafka-client-metrics.sh
+  kafka-cluster:
+    command: opt/kafka/bin/bin-wrapper.bash
+    aliases:
+      - kafka-cluster
+    plugs:
+      - network
+      - network-bind
+      - mount-observe
+      - home
+    environment:
+      bin_script: kafka-cluster.sh
+  kafka-configs:
+    command: opt/kafka/bin/bin-wrapper.bash
+    aliases:
+      - kafka-configs
+    plugs:
+      - network
+      - network-bind
+      - mount-observe
+      - home
+    environment:
+      bin_script: kafka-configs.sh
+  kafka-console-consumer:
+    command: opt/kafka/bin/bin-wrapper.bash
+    aliases:
+      - kafka-console-consumer
+    plugs:
+      - network
+      - network-bind
+      - mount-observe
+      - home
+    environment:
+      bin_script: kafka-console-consumer.sh
+  kafka-console-producer:
+    command: opt/kafka/bin/bin-wrapper.bash
+    aliases:
+      - kafka-console-producer
+    plugs:
+      - network
+      - network-bind
+      - mount-observe
+      - home
+    environment:
+      bin_script: kafka-console-producer.sh
+  kafka-consumer-groups:
+    command: opt/kafka/bin/bin-wrapper.bash
+    aliases:
+      - kafka-consumer-groups
+    plugs:
+      - network
+      - network-bind
+      - mount-observe
+      - home
+    environment:
+      bin_script: kafka-consumer-groups.sh
+  kafka-consumer-perf-test:
+    command: opt/kafka/bin/bin-wrapper.bash
+    aliases:
+      - kafka-consumer-perf-test
+    plugs:
+      - network
+      - network-bind
+      - mount-observe
+      - home
+    environment:
+      bin_script: kafka-consumer-perf-test.sh
+  kafka-delegation-tokens:
+    command: opt/kafka/bin/bin-wrapper.bash
+    aliases:
+      - kafka-delegation-tokens
+    plugs:
+      - network
+      - network-bind
+      - mount-observe
+      - home
+    environment:
+      bin_script: kafka-delegation-tokens.sh
+  kafka-delete-records:
+    command: opt/kafka/bin/bin-wrapper.bash
+    aliases:
+      - kafka-delete-records
+    plugs:
+      - network
+      - network-bind
+      - mount-observe
+      - home
+    environment:
+      bin_script: kafka-delete-records.sh
+  kafka-dump-log:
+    command: opt/kafka/bin/bin-wrapper.bash
+    aliases:
+      - kafka-dump-log
+    plugs:
+      - network
+      - network-bind
+      - mount-observe
+      - home
+    environment:
+      bin_script: kafka-dump-log.sh
+  kafka-e2e-latency:
+    command: opt/kafka/bin/bin-wrapper.bash
+    aliases:
+      - kafka-e2e-latency
+    plugs:
+      - network
+      - network-bind
+      - mount-observe
+      - home
+    environment:
+      bin_script: kafka-e2e-latency.sh
+  kafka-features:
+    command: opt/kafka/bin/bin-wrapper.bash
+    aliases:
+      - kafka-features
+    plugs:
+      - network
+      - network-bind
+      - mount-observe
+      - home
+    environment:
+      bin_script: kafka-features.sh
+  kafka-get-offsets:
+    command: opt/kafka/bin/bin-wrapper.bash
+    aliases:
+      - kafka-get-offsets
+    plugs:
+      - network
+      - network-bind
+      - mount-observe
+      - home
+    environment:
+      bin_script: kafka-get-offsets.sh
+  kafka-jmx:
+    command: opt/kafka/bin/bin-wrapper.bash
+    aliases:
+      - kafka-jmx
+    plugs:
+      - network
+      - network-bind
+      - mount-observe
+      - home
+    environment:
+      bin_script: kafka-jmx.sh
+  kafka-leader-election:
+    command: opt/kafka/bin/bin-wrapper.bash
+    aliases:
+      - kafka-leader-election
+    plugs:
+      - network
+      - network-bind
+      - mount-observe
+      - home
+    environment:
+      bin_script: kafka-leader-election.sh
+  kafka-log-dirs:
+    command: opt/kafka/bin/bin-wrapper.bash
+    aliases:
+      - kafka-log-dirs
+    plugs:
+      - network
+      - network-bind
+      - mount-observe
+      - home
+    environment:
+      bin_script: kafka-log-dirs.sh
+  kafka-metadata-quorum:
+    command: opt/kafka/bin/bin-wrapper.bash
+    aliases:
+      - kafka-metadata-quorum
+    plugs:
+      - network
+      - network-bind
+      - mount-observe
+      - home
+    environment:
+      bin_script: kafka-metadata-quorum.sh
+  kafka-metadata-shell:
+    command: opt/kafka/bin/bin-wrapper.bash
+    aliases:
+      - kafka-metadata-shell
+    plugs:
+      - network
+      - network-bind
+      - mount-observe
+      - home
+    environment:
+      bin_script: kafka-metadata-shell.sh
+  kafka-producer-perf-test:
+    command: opt/kafka/bin/bin-wrapper.bash
+    aliases:
+      - kafka-producer-perf-test
+    plugs:
+      - network
+      - network-bind
+      - mount-observe
+      - home
+    environment:
+      bin_script: kafka-producer-perf-test.sh
+  kafka-reassign-partitions:
+    command: opt/kafka/bin/bin-wrapper.bash
+    aliases:
+      - kafka-reassign-partitions
+    plugs:
+      - network
+      - network-bind
+      - mount-observe
+      - home
+    environment:
+      bin_script: kafka-reassign-partitions.sh
+  kafka-replica-verification:
+    command: opt/kafka/bin/bin-wrapper.bash
+    aliases:
+      - kafka-replica-verification
+    plugs:
+      - network
+      - network-bind
+      - mount-observe
+      - home
+    environment:
+      bin_script: kafka-replica-verification.sh
+  kafka-run-class:
+    command: opt/kafka/bin/bin-wrapper.bash
+    aliases:
+      - kafka-run-class
+    plugs:
+      - network
+      - network-bind
+      - mount-observe
+      - home
+    environment:
+      bin_script: kafka-run-class.sh
+  kafka-storage:
+    command: opt/kafka/bin/bin-wrapper.bash
+    aliases:
+      - kafka-storage
+    plugs:
+      - network
+      - network-bind
+      - mount-observe
+      - home
+    environment:
+      bin_script: kafka-storage.sh
+  kafka-streams-application-reset:
+    command: opt/kafka/bin/bin-wrapper.bash
+    aliases:
+      - kafka-streams-application-reset
+    plugs:
+      - network
+      - network-bind
+      - mount-observe
+      - home
+    environment:
+      bin_script: kafka-streams-application-reset.sh
+  kafka-topics:
+    command: opt/kafka/bin/bin-wrapper.bash
+    aliases:
+      - kafka-topics
+    plugs:
+      - network
+      - network-bind
+      - mount-observe
+      - home
+    environment:
+      bin_script: kafka-topics.sh
+  kafka-transactions:
+    command: opt/kafka/bin/bin-wrapper.bash
+    aliases:
+      - kafka-transactions
+    plugs:
+      - network
+      - network-bind
+      - mount-observe
+      - home
+    environment:
+      bin_script: kafka-transactions.sh
+  kafka-verifiable-consumer:
+    command: opt/kafka/bin/bin-wrapper.bash
+    aliases:
+      - kafka-verifiable-consumer
+    plugs:
+      - network
+      - network-bind
+      - mount-observe
+      - home
+    environment:
+      bin_script: kafka-verifiable-consumer.sh
+  kafka-verifiable-producer:
+    command: opt/kafka/bin/bin-wrapper.bash
+    aliases:
+      - kafka-verifiable-producer
+    plugs:
+      - network
+      - network-bind
+      - mount-observe
+      - home
+    environment:
+      bin_script: kafka-verifiable-producer.sh
+  trogdor:
+    command: opt/kafka/bin/bin-wrapper.bash
+    aliases:
+      - trogdor
+    plugs:
+      - network
+      - network-bind
+      - mount-observe
+      - home
+    environment:
+      bin_script: trogdor.sh
+  connect-distributed:
+    command: opt/connect/bin/connect-wrapper.bash
+    daemon: simple
+    install-mode: disable
+    aliases:
+      - connect-distributed
+    environment:
+      LOG_DIR: $SNAP_COMMON/var/log/connect
+    plugs:
+      - network
+      - network-bind
+      - mount-observe
+  # connect-standalone and connect-mirror-maker are foreground/one-shot: ordinary apps taking their config as arguments.
+  connect-standalone:
+    command: opt/kafka/bin/bin-wrapper.bash
+    aliases:
+      - connect-standalone
+    plugs:
+      - network
+      - network-bind
+      - mount-observe
+      - home
+    environment:
+      bin_script: connect-standalone.sh
+  connect-mirror-maker:
+    command: opt/kafka/bin/bin-wrapper.bash
+    aliases:
+      - connect-mirror-maker
+    plugs:
+      - network
+      - network-bind
+      - mount-observe
+      - home
+    environment:
+      bin_script: connect-mirror-maker.sh
+  connect-plugin-path:
+    command: opt/kafka/bin/bin-wrapper.bash
+    aliases:
+      - connect-plugin-path
+    plugs:
+      - network
+      - network-bind
+      - mount-observe
+      - home
+    environment:
+      bin_script: connect-plugin-path.sh
+
+  # --- Utilities ----------------------------------------------------------
+  keytool:
+    command: usr/lib/jvm/java-slim/bin/keytool
+    aliases:
+      - keytool
+    plugs:
+      - home
+      - mount-observe
+
+parts:
+  # setpriv (util-linux): the daemon wrappers use it to drop to the _daemon_ user.
+  dependencies:
+    plugin: nil
+    stage-packages:
+      - util-linux
+      - ca-certificates
+
+  # Minimal jlinked OpenJDK 21 (only the modules Kafka needs) at the arch-independent usr/lib/jvm/java-slim.
+  java-runtime:
+    plugin: nil
+    build-packages:
+      - openjdk-21-jdk-headless
+      - ca-certificates-java
+    override-build: |
+      # Modules Kafka needs: java.base, JMX, SASL/GSSAPI/Kerberos, TLS+XML crypto, jdk.unsupported (sun.misc.Unsafe).
+      modules="java.base,java.compiler,java.desktop,java.instrument"
+      modules="${modules},java.management,java.management.rmi,java.naming"
+      modules="${modules},java.rmi,java.scripting,java.security.jgss"
+      modules="${modules},java.security.sasl,java.sql,java.xml"
+      modules="${modules},jdk.attach,jdk.crypto.cryptoki,jdk.crypto.ec"
+      modules="${modules},jdk.jfr,jdk.management,jdk.management.agent"
+      modules="${modules},jdk.naming.dns,jdk.naming.rmi,jdk.net"
+      modules="${modules},jdk.security.auth,jdk.security.jgss"
+      modules="${modules},jdk.unsupported,jdk.zipfs"
+
+      jlink \
+        --add-modules "${modules}" \
+        --strip-debug \
+        --no-man-pages \
+        --no-header-files \
+        --compress=zip-6 \
+        --output "${CRAFT_PART_INSTALL}/usr/lib/jvm/java-slim"
+
+      # jlink does not follow the cacerts symlink, so replace its empty bundle with the distro trust store.
+      update-ca-certificates -f
+      test -s /etc/ssl/certs/java/cacerts
+      cp /etc/ssl/certs/java/cacerts \
+        "${CRAFT_PART_INSTALL}/usr/lib/jvm/java-slim/lib/security/cacerts"
+    stage:
+      - usr/lib/jvm/java-slim
+
+  # Upstream Apache Kafka under opt/kafka; tarball URL resolved from central-uploader at build time.
+  kafka:
+    plugin: nil
+    after: [java-runtime]
+    build-packages:
+      - curl
+      - ca-certificates
+    override-build: |
+      craftctl default
+      version="$(craftctl get version)"
+      # central-uploader tags releases apache-kafka_2.13-<ver>-ubuntu<N>, each with one .tar.gz; resolve its URL.
+      for patch in ubuntu2 ubuntu1 ubuntu0; do
+        tag="apache-kafka_2.13-${version}-${patch}"
+        api="https://api.github.com/repos/canonical/central-uploader/releases/tags/${tag}"
+        url="$(curl -fsSL "${api}" 2>/dev/null \
+          | grep -oE '"browser_download_url": *"[^"]+\.tar.gz"' \
+          | head -n1 | cut -d'"' -f4 || true)"
+        [ -n "${url}" ] && break
+      done
+      if [ -z "${url}" ]; then
+        echo "no central-uploader release found for Kafka ${version}" >&2
+        exit 1
+      fi
+      curl -fL -o apache-kafka.tar.gz "${url}"
+
+      mkdir -p "${CRAFT_PART_INSTALL}/opt/kafka"
+      tar -xzf apache-kafka.tar.gz -C "${CRAFT_PART_INSTALL}/opt/kafka" --strip-components=1
+      rm -f apache-kafka.tar.gz
+
+      # The site_docs/ tree and Windows scripts are of no use inside the snap.
+      rm -rf "${CRAFT_PART_INSTALL}/opt/kafka/site-docs"
+      rm -rf "${CRAFT_PART_INSTALL}/opt/kafka/bin/windows"
+      find "${CRAFT_PART_INSTALL}/opt/kafka/bin/" -name '*.sh' -exec chmod a+x {} +
+
+  # Local wrappers, shared helper scripts and hooks.
+  wrapper:
+    plugin: dump
+    source: snap/local

@@ -1,0 +1,19 @@
+#!/usr/bin/env bash
+# Runs on install, refresh and every `snap set` and renders server.properties
+
+set -eu
+
+source "${SNAP}/opt/shared/bin/render-config.sh"
+
+# no-op until install hook has set default config
+if [ ! -f "${CONF_FILE}" ]; then
+    exit 0
+fi
+
+ensure_state_file
+
+# validations run before any write, so a rejected `snap set` does not update server.properties
+reject_unsupported_options
+reject_blocked_options
+
+render_config

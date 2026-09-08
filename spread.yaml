@@ -1,0 +1,59 @@
+project: kafka
+
+# "snapcraft test" packs the snap, pushes this dir to a backend and runs tests/spread/; sits in the project root.
+backends:
+  craft:
+    # Naming the type stops snapcraft's default "craft" backend substitution; the wiring is spelled out here instead.
+    type: adhoc
+    allocate: ADDRESS $(./tests/spread/.extension allocate)
+    discard: ./tests/spread/.extension discard
+    prepare: '"$PROJECT_PATH"/tests/spread/.extension backend-prepare'
+    restore: '"$PROJECT_PATH"/tests/spread/.extension backend-restore'
+    prepare-each: '"$PROJECT_PATH"/tests/spread/.extension backend-prepare-each'
+    restore-each: '"$PROJECT_PATH"/tests/spread/.extension backend-restore-each'
+    systems:
+      # the base the snap is built on
+      - ubuntu-26.04
+
+suites:
+  tests/spread/:
+    summary: Tests against an installed snap
+    prepare: |
+      # "just" runs the suites, and poetry installs what they import
+      apt-get install -y just python3-poetry
+
+      snap install "$CRAFT_ARTIFACT" --dangerous
+
+      # mount-observe and removable-media do not auto-connect; connect them for every capability the daemon declares.
+      cd "$PROJECT_PATH"
+      just connect-interfaces || true
+
+      snap start kafka.server
+
+      # Wait for the freshly-formatted broker to answer the Kafka protocol.
+      for _ in $(seq 60); do
+          if snap run kafka.kafka-broker-api-versions --bootstrap-server localhost:9092 >/dev/null 2>&1; then
+              ready=1
+              break
+          fi
+          echo "waiting for kafka to be ready..."
+          sleep 5
+      done
+      if [ -z "${ready:-}" ]; then
+          echo "kafka broker did not come up" >&2
+          snap logs kafka.server -n all >&2
+          exit 1
+      fi
+    restore: |
+      snap remove kafka --purge --terminate
+
+# Everything here is pushed to the instance; parts/stage/prime and the local .venv are excluded from the push.
+exclude:
+  - .git
+  - .tox
+  - .venv
+  - parts
+  - stage
+  - prime
+
+kill-timeout: 1h

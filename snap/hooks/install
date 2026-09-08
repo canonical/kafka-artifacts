@@ -1,0 +1,51 @@
+#!/usr/bin/env bash
+set -eux
+
+source "${SNAP}/opt/shared/bin/snap-logger.sh" "hook-install"
+source "${SNAP}/opt/shared/bin/set-conf.sh"
+
+# $SNAP_COMMON so config stays consistent with the formatted storage and cluster.id across refresh and revert.
+CONFIG_DIR="${SNAP_COMMON}/etc/kafka"
+SECRETS_DIR="${SNAP_COMMON}/etc/kafka/secrets"
+DATA_DIR="${SNAP_COMMON}/var/lib/kafka/data"
+LOG_DIR="${SNAP_COMMON}/var/log/kafka"
+CONNECT_LOG_DIR="${SNAP_COMMON}/var/log/connect"
+PLUGIN_DIR="${SNAP_COMMON}/var/lib/kafka/plugins"
+STATE_DIR="${SNAP_COMMON}/ops"
+
+# build the dir tree
+for dir in "${CONFIG_DIR}" "${SECRETS_DIR}" "${STATE_DIR}" "${LOG_DIR}" \
+           "${CONNECT_LOG_DIR}" "${PLUGIN_DIR}" "${DATA_DIR}"; do
+    mkdir -p "${dir}"
+done
+
+# seed config from upstream defaults
+find "${SNAP}/opt/kafka/config" -mindepth 1 -maxdepth 1 \
+    -exec cp -n -r "{}" "${CONFIG_DIR}" \;
+
+# update log.dirs to use $DATA_DIR
+SERVER_PROPERTIES="${CONFIG_DIR}/server.properties"
+if [ -f "${SERVER_PROPERTIES}" ]; then
+    set_prop "${SERVER_PROPERTIES}" "log.dirs" "${DATA_DIR}"
+fi
+
+# store the upstream default config to compare hook diffs against
+BASELINE="${STATE_DIR}/defaults.properties"
+if [ -f "${SERVER_PROPERTIES}" ] && [ ! -f "${BASELINE}" ]; then
+    cp "${SERVER_PROPERTIES}" "${BASELINE}"
+fi
+
+# set dir permissions
+for dir in "${STATE_DIR}" "${LOG_DIR}" "${CONNECT_LOG_DIR}" "${PLUGIN_DIR}" "${CONFIG_DIR}"; do
+    chown -R root:root "${dir}"
+    chmod -R 770 "${dir}"
+    chown -R _daemon_:root "${dir}"
+done
+
+chown -R root:root "${DATA_DIR}"
+chmod -R 750 "${DATA_DIR}"
+chown -R _daemon_:root "${DATA_DIR}"
+
+chown root:root "${SECRETS_DIR}"
+chmod 700 "${SECRETS_DIR}"
+chown _daemon_:root "${SECRETS_DIR}"
