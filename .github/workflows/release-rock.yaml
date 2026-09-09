@@ -1,0 +1,145 @@
+# Copyright 2026 Canonical Ltd.
+# See LICENSE file for licensing details.
+name: Release rock to GHCR
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+on:
+  push:
+    branches:
+      - '4/edge'
+  workflow_call:
+  workflow_dispatch:
+
+env:
+  # Published image path; a moving channel tag and a version-pinned tag are pushed below.
+  IMAGE_NAME: ghcr.io/canonical/kafka
+
+jobs:
+  release-checks:
+    name: Release checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Install yq
+        run: sudo snap install yq
+
+      # The release branch encodes the channel: '4/edge' -> track '4', risk 'edge'.
+      - name: Extract branch metadata
+        id: branch
+        shell: bash
+        run: |
+          branch=${GITHUB_REF#refs/heads/}
+          echo "track=${branch%%/*}" >> "$GITHUB_OUTPUT"
+          echo "risk=${branch##*/}" >> "$GITHUB_OUTPUT"
+
+      - name: Extract rock metadata
+        id: rock
+        shell: bash
+        run: |
+          echo "version=$(yq '(.version | split("-"))[0]' rock/rockcraft.yaml)" >> "$GITHUB_OUTPUT"
+          echo "base=$(yq '(.base | split("@"))[1]' rock/rockcraft.yaml)" >> "$GITHUB_OUTPUT"
+
+      # Guards against releasing, say, a 5.x rock from the '4/edge' branch.
+      - name: Check the rock version matches the release track
+        run: |
+          major="$(echo '${{ steps.rock.outputs.version }}' | cut -d. -f1)"
+          track='${{ steps.branch.outputs.track }}'
+          if [ "${major}" != "${track}" ]; then
+            echo "rock major version ${major} does not match release track ${track}" >&2
+            exit 1
+          fi
+
+    outputs:
+      track: ${{ steps.branch.outputs.track }}
+      risk: ${{ steps.branch.outputs.risk }}
+      version: ${{ steps.rock.outputs.version }}
+      base: ${{ steps.rock.outputs.base }}
+
+  build:
+    name: Build rock
+    uses: canonical/data-platform-workflows/.github/workflows/build_rock.yaml@v52.0.0
+    with:
+      path-to-rock-directory: rock
+
+  publish:
+    name: Publish rock
+    needs:
+      - release-checks
+      - build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Install tooling
+        run: |
+          sudo snap install rockcraft --classic
+          sudo snap install yq
+
+      - name: Download rock package(s)
+        uses: actions/download-artifact@v4
+        with:
+          pattern: ${{ needs.build.outputs.artifact-prefix }}-*
+          merge-multiple: true
+
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ secrets.GHCR_USER }}
+          password: ${{ secrets.GHCR_TOKEN }}
+
+      - name: Import the rocks and push to GHCR
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          track='${{ needs.release-checks.outputs.track }}'
+          risk='${{ needs.release-checks.outputs.risk }}'
+          version='${{ needs.release-checks.outputs.version }}'
+          base='${{ needs.release-checks.outputs.base }}'
+
+          channel_tag="${track}-${risk}"             # moving tag, e.g. 4-edge
+          version_tag="${version}-${base}_${risk}"   # pinned tag, e.g. 4.3.1-26.04_edge
+
+          commit_id="$(git rev-parse HEAD)"
+          description="$(yq '.description' rock/rockcraft.yaml | xargs)"
+          source="${{ github.server_url }}/${{ github.repository }}"
+
+          # Each per-arch .rock is loaded into the daemon, stamped with OCI labels (which GHCR
+          # uses to link the package to this repo), and pushed under an arch-suffixed tag. The
+          # classic builder relabels a foreign-arch base without a platform match, unlike buildkit.
+          arch_refs=()
+          for rock in *.rock; do
+            arch="$(echo "${rock}" | sed -E 's/.*_([^_]+)\.rock$/\1/')"
+            arch_ref="${IMAGE_NAME}:${channel_tag}-${arch}"
+
+            echo "===> importing ${rock} as ${arch_ref}"
+            sudo rockcraft.skopeo --insecure-policy copy \
+              "oci-archive:${rock}" "docker-daemon:${arch_ref}"
+
+            echo "FROM ${arch_ref}" | DOCKER_BUILDKIT=0 docker build \
+              --label org.opencontainers.image.description="${description}" \
+              --label org.opencontainers.image.revision="${commit_id}" \
+              --label org.opencontainers.image.source="${source}" \
+              -t "${arch_ref}" -
+
+            docker push "${arch_ref}"
+            arch_refs+=("${arch_ref}")
+          done
+
+          # Join the per-arch images into one multi-arch manifest list per published tag.
+          for tag in "${channel_tag}" "${version_tag}"; do
+            echo "===> publishing ${IMAGE_NAME}:${tag}"
+            docker buildx imagetools create -t "${IMAGE_NAME}:${tag}" "${arch_refs[@]}"
+          done
