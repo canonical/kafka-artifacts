@@ -1,0 +1,5 @@
+summary: snap options and hand edits render onto server.properties as documented
+
+execute: |
+  cd "$PROJECT_PATH"
+  just config

@@ -1,0 +1,13 @@
+parts
+prime
+stage
+snap/.snapcraft
+.snapcraft
+*.snap
+*.tgz
+*_source.tar.bz2
+.*.swp
+__pycache__
+.pytest_cache
+.venv
+
