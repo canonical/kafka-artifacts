@@ -36,8 +36,16 @@ def find_snap() -> Path | None:
     if env:
         return Path(env)
 
+    # CI downloads every platform's snap into the repo root, so match the host
+    # architecture; picking by mtime alone can select an incompatible-arch snap
+    arch = subprocess.run(
+        ["dpkg", "--print-architecture"], text=True, capture_output=True
+    ).stdout.strip()
+
     built = sorted(
-        REPO.glob("kafka_*.snap"), key=lambda p: p.stat().st_mtime, reverse=True
+        REPO.glob(f"kafka_*_{arch}.snap"),
+        key=lambda p: p.stat().st_mtime,
+        reverse=True,
     )
     return built[0] if built else None
 
