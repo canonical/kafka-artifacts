@@ -251,6 +251,38 @@ sudo snap connect kafka:removable-media
 sudo snap connect kafka:home
 ```
 
+## Rock image
+
+Alongside the snap, this repository builds a [rock](https://documentation.ubuntu.com/rockcraft/)
+— an OCI image for Apache Kafka defined in `rock/rockcraft.yaml` and supervised at runtime by
+[Pebble](https://github.com/canonical/pebble). Like the snap it bundles a slim OpenJDK and the
+upstream Kafka distribution, but it is configured through `KAFKA_*` environment variables (or
+`KEY=value` run arguments) that `kafka.docker.KafkaDockerWrapper` folds into `server.properties`
+on start-up; a cluster id is generated and the KRaft storage formatted automatically, so a bare
+run comes up as a working single node with the broker listening on `9092`. Build it with
+`rockcraft pack`, load the resulting `.rock` into the daemon, and start it:
+
+```bash
+rockcraft pack                                   # produces kafka_4.3.1_<arch>.rock
+rockcraft.skopeo --insecure-policy copy \
+  oci-archive:kafka_4.3.1_amd64.rock docker-daemon:kafka:4.3.1
+docker run -d --name kafka -p 9092:9092 kafka:4.3.1
+```
+
+Like the snap, the runtime carries the full platform module set, so side-loaded plugins never
+fail on a trimmed module. Jars mounted or copied into `/var/lib/kafka/plugins/broker` (owned by
+`appuser`, uid 1000) are placed on the broker's classpath automatically — broker-side authorizers,
+metric reporters and the like need no `CLASSPATH` change:
+
+```bash
+docker run -d -p 9092:9092 \
+  -v /path/to/my-plugins:/var/lib/kafka/plugins/broker:ro \
+  kafka:4.3.1
+```
+
+The rock's service is the broker only. `/var/lib/kafka/plugins/connect` is provided for a
+Connect worker run from the image — point its `plugin.path` at that directory.
+
 ## Building
 
 ```bash

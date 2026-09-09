@@ -1,0 +1,189 @@
+name: kafka
+base: ubuntu@26.04
+
+version: '4.3.1'
+
+summary: Apache Kafka as a rock image.
+description: |
+  A standalone rock image for Apache Kafka, a distributed event streaming
+  platform.
+
+license: Apache-2.0
+
+platforms:
+  amd64:
+  arm64:
+
+environment:
+  JAVA_HOME: /opt/java/openjdk
+  LOG_DIR: /var/log/kafka
+  LANG: C.UTF-8
+  PEBBLE_VERBOSE: "1"
+  PATH: /usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/opt/java/openjdk/bin:/opt/kafka/bin
+
+services:
+  kafka:
+    override: replace
+    startup: enabled
+    command: /usr/local/bin/docker-entrypoint.sh [ ]
+    user: appuser
+    group: appuser
+    working-dir: /var/lib/kafka/data
+    on-success: shutdown
+    on-failure: shutdown
+
+entrypoint-service: kafka
+
+checks:
+  broker:
+    override: replace
+    level: ready
+    period: 10s
+    timeout: 3s
+    threshold: 3
+    tcp:
+      port: 9092
+
+parts:
+  # The unprivileged account Kafka runs as, at a fixed uid and gid.
+  user:
+    plugin: nil
+    overlay-script: |
+      # ubuntu@26.04 ships a default "ubuntu" user at uid/gid 1000; appuser has
+      # to own that uid/gid so a data volume shared across an upgrade keeps the
+      # same ownership, so reclaim 1000 before creating appuser.
+      userdel --root "${CRAFT_OVERLAY}" --remove ubuntu 2>/dev/null || true
+      groupdel --root "${CRAFT_OVERLAY}" ubuntu 2>/dev/null || true
+      groupadd --root "${CRAFT_OVERLAY}" -g 1000 appuser
+      useradd --root "${CRAFT_OVERLAY}" -g appuser -u 1000 \
+        --home-dir /home/appuser --create-home --shell /bin/bash appuser
+
+  dependencies:
+    plugin: nil
+    stage-packages:
+      # "free" and "ps", which the kafka start scripts size the heap with
+      - procps
+      # for kafka clients to verify the certificate of a TLS-enabled broker
+      - ca-certificates
+
+  java-runtime:
+    plugin: nil
+    build-packages:
+      - openjdk-21-jdk-headless
+      - ca-certificates-java
+    override-build: |
+      # The whole platform module set is kept (not just Kafka's own), matching the runtime
+      # jlinked into the kafka snap in this repository, so side-loaded plugins cannot fail on
+      # a trimmed module: a jlinked image is closed, so a missing module cannot be added back
+      # later. The size win comes from the stripping/compression below and from dropping native
+      # libs, not from dropping modules.
+      jmods="$(dirname "$(dirname "$(readlink -f "$(command -v jlink)")")")/jmods"
+
+      # /opt/java/openjdk is the runtime location JAVA_HOME points at above.
+      jlink \
+        --module-path "${jmods}" \
+        --add-modules ALL-MODULE-PATH \
+        --strip-debug \
+        --no-man-pages \
+        --no-header-files \
+        --compress=zip-6 \
+        --output "${CRAFT_PART_INSTALL}/opt/java/openjdk"
+
+      # jlink does not follow the JDK's lib/security/cacerts symlink, so replace
+      # the empty bundle it generated with the distro trust store.
+      update-ca-certificates -f
+      test -s /etc/ssl/certs/java/cacerts
+      cp /etc/ssl/certs/java/cacerts \
+        "${CRAFT_PART_INSTALL}/opt/java/openjdk/lib/security/cacerts"
+    stage:
+      - opt/java/openjdk
+
+  kafka:
+    plugin: nil
+    after: [java-runtime]
+    build-packages:
+      - curl
+      - ca-certificates
+    override-build: |
+      craftctl default
+      version="$(craftctl get version)"
+
+      # central-uploader tags releases apache-kafka_2.13-<ver>-ubuntu<N>, each
+      # with one .tar.gz; resolve its URL, the same source as the kafka snap.
+      for patch in ubuntu2 ubuntu1 ubuntu0; do
+        tag="apache-kafka_2.13-${version}-${patch}"
+        api="https://api.github.com/repos/canonical/central-uploader/releases/tags/${tag}"
+        url="$(curl -fsSL "${api}" 2>/dev/null \
+          | grep -oE '"browser_download_url": *"[^"]+\.tar.gz"' \
+          | head -n1 | cut -d'"' -f4 || true)"
+        [ -n "${url}" ] && break
+      done
+      if [ -z "${url}" ]; then
+        echo "no central-uploader release found for Kafka ${version}" >&2
+        exit 1
+      fi
+      curl -fL -o apache-kafka.tar.gz "${url}"
+
+      mkdir -p "${CRAFT_PART_INSTALL}/opt/kafka"
+      tar -xzf apache-kafka.tar.gz -C "${CRAFT_PART_INSTALL}/opt/kafka" --strip-components=1
+      rm -f apache-kafka.tar.gz
+
+      # The site-docs tree and Windows scripts are of no use inside the rock.
+      rm -rf "${CRAFT_PART_INSTALL}/opt/kafka/site-docs"
+      rm -rf "${CRAFT_PART_INSTALL}/opt/kafka/bin/windows"
+      find "${CRAFT_PART_INSTALL}/opt/kafka/bin/" -name '*.sh' -exec chmod a+x {} +
+
+      # KafkaDockerWrapper reads the log4j configs from its --default-configs-dir
+      # alongside the server.properties template shipped under rock/local, seeded
+      # here from the distribution's own config.
+      mkdir -p "${CRAFT_PART_INSTALL}/etc/kafka/docker"
+      cp "${CRAFT_PART_INSTALL}/opt/kafka/config/log4j2.yaml" \
+         "${CRAFT_PART_INSTALL}/etc/kafka/docker/log4j2.yaml"
+      cp "${CRAFT_PART_INSTALL}/opt/kafka/config/tools-log4j2.yaml" \
+         "${CRAFT_PART_INSTALL}/etc/kafka/docker/tools-log4j2.yaml"
+
+      # The runtime directories the broker owns: data (log.dirs), GC logs, TLS material,
+      # the mount point for user-supplied config overrides, and the side-load plugin dirs
+      # (broker/ lands on the broker classpath; connect/ is for a user-run Connect worker).
+      mkdir -p "${CRAFT_PART_INSTALL}/var/lib/kafka/data" \
+               "${CRAFT_PART_INSTALL}/var/log/kafka" \
+               "${CRAFT_PART_INSTALL}/etc/kafka/secrets" \
+               "${CRAFT_PART_INSTALL}/var/lib/kafka/plugins/broker" \
+               "${CRAFT_PART_INSTALL}/var/lib/kafka/plugins/connect" \
+               "${CRAFT_PART_INSTALL}/mnt/shared/config"
+    permissions:
+      # KafkaDockerWrapper writes the rendered server.properties back into the
+      # config directory, so appuser has to own it.
+      - path: opt/kafka/config
+        owner: 1000
+        group: 1000
+      - path: opt/kafka/config/*
+        owner: 1000
+        group: 1000
+      - path: var/lib/kafka/data
+        owner: 1000
+        group: 1000
+        mode: "750"
+      - path: var/log/kafka
+        owner: 1000
+        group: 1000
+        mode: "750"
+      - path: etc/kafka/secrets
+        owner: 1000
+        group: 1000
+        mode: "700"
+      - path: var/lib/kafka/plugins/broker
+        owner: 1000
+        group: 1000
+        mode: "750"
+      - path: var/lib/kafka/plugins/connect
+        owner: 1000
+        group: 1000
+        mode: "750"
+      - path: mnt/shared/config
+        owner: 1000
+        group: 1000
+
+  entrypoint:
+    plugin: dump
+    source: local

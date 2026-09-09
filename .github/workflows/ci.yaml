@@ -26,6 +26,30 @@ jobs:
     name: Build snap
     uses: canonical/data-platform-workflows/.github/workflows/build_snap.yaml@v52.0.0
 
+  build-rock:
+    name: Build rock
+    uses: canonical/data-platform-workflows/.github/workflows/build_rock.yaml@v52.0.0
+    with:
+      path-to-rock-directory: rock
+
+  test-rock:
+    name: Test rock
+    needs:
+      - lint
+      - build-rock
+    uses: ./.github/workflows/test-rock.yaml
+    with:
+      artifact-prefix: ${{ needs.build-rock.outputs.artifact-prefix }}
+
+  test-rock-upgrade:
+    name: Test rock upgrade
+    needs:
+      - lint
+      - build-rock
+    uses: ./.github/workflows/test-rock-upgrade.yaml
+    with:
+      artifact-prefix: ${{ needs.build-rock.outputs.artifact-prefix }}
+
   test:
     name: Test snap
     runs-on: ubuntu-latest

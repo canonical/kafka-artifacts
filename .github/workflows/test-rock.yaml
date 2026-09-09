@@ -1,0 +1,193 @@
+name: Test rock
+
+on:
+  workflow_call:
+    inputs:
+      artifact-prefix:
+        description: Prefix of the artifact(s) holding the packed rock
+        type: string
+        default: packed-rock
+
+# A shared cluster id, so the three combined nodes format the same KRaft cluster.
+env:
+  CLUSTER_ID: 5L6g3nShT-eMCtK--X86sw
+
+jobs:
+  test-rock:
+    name: Rock smoke tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      # for rockcraft.skopeo, which the rock is handed to docker with
+      - name: Install rockcraft
+        run: sudo snap install rockcraft --classic
+
+      - name: Download rock package(s)
+        uses: actions/download-artifact@v8
+        with:
+          pattern: ${{ inputs.artifact-prefix }}-*
+          merge-multiple: true
+
+      - name: Load the rock into the docker daemon
+        run: |
+          rock="$(find . -name '*.rock' -print -quit)"
+          if [ -z "${rock}" ]; then
+            echo "No .rock file among the downloaded artifacts" >&2
+            exit 1
+          fi
+          echo "Loading ${rock}"
+
+          rockcraft.skopeo --insecure-policy copy \
+            "oci-archive:${rock}" docker-daemon:kafka:test
+
+      - name: Write the readiness helper
+        run: |
+          cat > "${RUNNER_TEMP}/wait-for-broker.sh" <<'EOF'
+          #!/usr/bin/env bash
+          # Waits for the broker in <container> to answer the protocol on 9092.
+          set -uo pipefail
+          container="$1"
+
+          for _ in $(seq 1 60); do
+            if docker exec "${container}" \
+              /opt/kafka/bin/kafka-broker-api-versions.sh \
+              --bootstrap-server localhost:9092 >/dev/null 2>&1; then
+              echo "${container} is up"
+              exit 0
+            fi
+            echo "Waiting for ${container} to be ready..."
+            sleep 5
+          done
+
+          echo "Timed out waiting for ${container}" >&2
+          exit 1
+          EOF
+          chmod +x "${RUNNER_TEMP}/wait-for-broker.sh"
+
+      # "docker run <rock>" with no KAFKA_* overrides has to boot a working
+      # broker straight from the shipped template. Passing any KAFKA_* value
+      # replaces that template wholesale, so the override check lives on a
+      # cluster node further down where a complete config is supplied alongside
+      # it.
+      - name: Start a single node
+        run: |
+          docker run -d --name kafka -p 9092:9092 \
+            -e CLUSTER_ID \
+            kafka:test
+
+      - name: Wait for the node to be up
+        run: bash "${RUNNER_TEMP}/wait-for-broker.sh" kafka
+
+      - name: Produce and consume through the console tools
+        run: |
+          docker exec kafka /opt/kafka/bin/kafka-topics.sh \
+            --create --topic smoke --partitions 1 --replication-factor 1 \
+            --bootstrap-server localhost:9092
+
+          echo "hello" | docker exec -i kafka /opt/kafka/bin/kafka-console-producer.sh \
+            --topic smoke --bootstrap-server localhost:9092
+
+          result="$(docker exec kafka /opt/kafka/bin/kafka-console-consumer.sh \
+            --topic smoke --from-beginning --max-messages 1 \
+            --timeout-ms 30000 --bootstrap-server localhost:9092)"
+          echo "${result}"
+          echo "${result}" | grep -q hello
+
+      - name: Check the shipped template rendered the default config
+        run: |
+          docker exec kafka grep -q '^process.roles=broker,controller' /opt/kafka/config/server.properties
+
+      - name: Check the broker's own output reaches docker logs
+        run: docker logs kafka 2>&1 | grep -q 'Kafka Server started'
+
+      # The runtime carries the full platform module set, so a side-loaded plugin cannot fail
+      # on a module the old trimmed list dropped (jlinked images are closed).
+      - name: Check the runtime bundles the full module set
+        run: |
+          modules="$(docker exec kafka /opt/java/openjdk/bin/java --list-modules)"
+          for m in jdk.httpserver java.net.http java.sql.rowset; do
+            echo "${modules}" | grep -q "^${m}@" \
+              || { echo "runtime is missing platform module: ${m}" >&2; exit 1; }
+          done
+
+      # Jars dropped in the broker side-load dir are picked up: the entrypoint puts the dir on
+      # the broker's classpath (kafka.Kafka is the broker main class).
+      - name: Check the broker classpath includes the side-load dir
+        run: |
+          cmdline="$(docker exec kafka bash -c 'tr "\0" " " < /proc/$(pgrep -f kafka.Kafka | head -1)/cmdline')"
+          echo "${cmdline}" | grep -q '/var/lib/kafka/plugins/broker' \
+            || { echo "broker side-load dir not on the broker classpath" >&2; exit 1; }
+
+      - name: Remove the single node
+        run: docker rm --force kafka
+
+      - name: Start a three node cluster
+        run: |
+          docker network create kafka-net
+          common=(
+            -e CLUSTER_ID
+            -e KAFKA_PROCESS_ROLES=broker,controller
+            -e KAFKA_CONTROLLER_QUORUM_VOTERS=1@kafka1:9093,2@kafka2:9093,3@kafka3:9093
+            -e KAFKA_CONTROLLER_LISTENER_NAMES=CONTROLLER
+            -e KAFKA_LISTENERS=PLAINTEXT://:9092,CONTROLLER://:9093
+            -e KAFKA_INTER_BROKER_LISTENER_NAME=PLAINTEXT
+            -e KAFKA_LISTENER_SECURITY_PROTOCOL_MAP=CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT
+            -e KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR=3
+            -e KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR=3
+            -e KAFKA_TRANSACTION_STATE_LOG_MIN_ISR=2
+            -e KAFKA_SHARE_COORDINATOR_STATE_TOPIC_REPLICATION_FACTOR=3
+            -e KAFKA_SHARE_COORDINATOR_STATE_TOPIC_MIN_ISR=2
+          )
+          for id in 1 2 3; do
+            # node 1 also takes a positional CMD argument, which the entrypoint
+            # exports as a KAFKA_* override on top of its complete config; the
+            # rendered value is asserted once the cluster is up.
+            arg=()
+            [ "${id}" = "1" ] && arg=(KAFKA_NUM_PARTITIONS=7)
+            docker run -d --name "kafka${id}" --network kafka-net \
+              "${common[@]}" \
+              -e KAFKA_NODE_ID="${id}" \
+              -e KAFKA_ADVERTISED_LISTENERS="PLAINTEXT://kafka${id}:9092" \
+              kafka:test "${arg[@]}"
+          done
+
+      - name: Wait for the cluster to be up
+        run: |
+          for id in 1 2 3; do
+            bash "${RUNNER_TEMP}/wait-for-broker.sh" "kafka${id}"
+          done
+
+      - name: Produce on one node and read it back on another
+        run: |
+          docker exec kafka1 /opt/kafka/bin/kafka-topics.sh \
+            --create --topic multi --partitions 3 --replication-factor 3 \
+            --bootstrap-server kafka1:9092
+
+          echo "hello-cluster" | docker exec -i kafka1 /opt/kafka/bin/kafka-console-producer.sh \
+            --topic multi --bootstrap-server kafka1:9092
+
+          result="$(docker exec kafka3 /opt/kafka/bin/kafka-console-consumer.sh \
+            --topic multi --from-beginning --max-messages 1 \
+            --timeout-ms 30000 --bootstrap-server kafka3:9092)"
+          echo "${result}"
+          echo "${result}" | grep -q hello-cluster
+
+      - name: Check the positional-argument override reached Kafka
+        run: |
+          docker exec kafka1 grep -q '^num.partitions=7' /opt/kafka/config/server.properties
+
+      - name: Check the topic is replicated across all three nodes
+        run: |
+          result="$(docker exec kafka2 /opt/kafka/bin/kafka-topics.sh \
+            --describe --topic multi --bootstrap-server kafka2:9092)"
+          echo "${result}"
+          echo "${result}" | grep -q 'ReplicationFactor: 3'
+
+      - name: Dump the container logs
+        if: failure()
+        run: |
+          for container in $(docker ps --all --format '{{.Names}}'); do
+            echo "::group::docker logs ${container}"
+            docker logs "${container}" 2>&1 || true
+            echo "::endgroup::"
+          done
