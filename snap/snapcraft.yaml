@@ -10,8 +10,9 @@ description: |
 grade: stable
 confinement: strict
 
-# The headless java-slim runtime is jlinked without the X11/desktop/sound modules, so the
-# library linter's missing/unused-dependency warnings for its .so files are expected noise.
+# The headless java-slim runtime is a jlinked OpenJDK carrying the full platform module set (so
+# side-loaded plugins never fail on a trimmed module) but stripped of debug info; the library
+# linter's missing/unused-dependency warnings for its .so files are expected noise.
 lint:
   ignore:
     - library:
@@ -479,26 +480,22 @@ parts:
       - util-linux
       - ca-certificates
 
-  # Minimal jlinked OpenJDK 21 (only the modules Kafka needs) at the arch-independent usr/lib/jvm/java-slim.
+  # jlinked OpenJDK 21 carrying the full platform module set at the arch-independent usr/lib/jvm/java-slim.
   java-runtime:
     plugin: nil
     build-packages:
       - openjdk-21-jdk-headless
       - ca-certificates-java
     override-build: |
-      # Modules Kafka needs: java.base, JMX, SASL/GSSAPI/Kerberos, TLS+XML crypto, jdk.unsupported (sun.misc.Unsafe).
-      modules="java.base,java.compiler,java.desktop,java.instrument"
-      modules="${modules},java.management,java.management.rmi,java.naming"
-      modules="${modules},java.rmi,java.scripting,java.security.jgss"
-      modules="${modules},java.security.sasl,java.sql,java.xml"
-      modules="${modules},jdk.attach,jdk.crypto.cryptoki,jdk.crypto.ec"
-      modules="${modules},jdk.jfr,jdk.management,jdk.management.agent"
-      modules="${modules},jdk.naming.dns,jdk.naming.rmi,jdk.net"
-      modules="${modules},jdk.security.auth,jdk.security.jgss"
-      modules="${modules},jdk.unsupported,jdk.zipfs"
+      # The whole platform module set is kept (not just Kafka's own) so side-loaded plugins/connectors
+      # cannot fail on a trimmed module: a jlinked image is closed, so a missing module cannot be added
+      # back later. The size win comes from the stripping/compression below and from dropping native
+      # libs, not from dropping modules, so the compatibility gain costs little.
+      jmods="$(dirname "$(dirname "$(readlink -f "$(command -v jlink)")")")/jmods"
 
       jlink \
-        --add-modules "${modules}" \
+        --module-path "${jmods}" \
+        --add-modules ALL-MODULE-PATH \
         --strip-debug \
         --no-man-pages \
         --no-header-files \

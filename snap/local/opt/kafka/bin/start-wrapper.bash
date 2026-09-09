@@ -4,6 +4,10 @@ set -eu
 
 source "${SNAP}/opt/shared/bin/set-conf.sh"
 
+# side-loaded broker plugins: kafka-run-class prepends a pre-set CLASSPATH, so these load ahead of
+# core libs; the '/*' wildcard is expanded by the JVM, and an empty dir contributes nothing.
+export CLASSPATH="${SNAP_COMMON}/var/lib/kafka/plugins/broker/*${CLASSPATH:+:${CLASSPATH}}"
+
 CONF_FILE="${SNAP_COMMON}/etc/kafka/server.properties"
 CLUSTER_ID_FILE="${SNAP_COMMON}/etc/kafka/cluster.id"
 SERVER_LOG4J="${SNAP_COMMON}/etc/kafka/log4j2.yaml"

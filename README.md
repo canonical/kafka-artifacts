@@ -52,7 +52,8 @@ Strict confinement forbids writing under `$SNAP`, so writable state lives under
 | TLS secrets                | `$SNAP_COMMON/etc/kafka/secrets`           |
 | Data / `log.dirs`          | `$SNAP_COMMON/var/lib/kafka/data`          |
 | Service logs               | `$SNAP_COMMON/var/log/kafka`               |
-| Connect plugin path        | `$SNAP_COMMON/var/lib/kafka/plugins`       |
+| Broker/tool plugin jars    | `$SNAP_COMMON/var/lib/kafka/plugins/broker`  |
+| Connect plugin path        | `$SNAP_COMMON/var/lib/kafka/plugins/connect` |
 | KRaft cluster-id marker    | `$SNAP_COMMON/etc/kafka/cluster.id`        |
 
 The rendered config files, seeded from the upstream defaults on first install,
@@ -172,6 +173,29 @@ sudo sed -i '/^controller.quorum.bootstrap.servers=/d' \
 sudo snap start kafka.server
 ```
 
+## Side-loading plugins and connectors
+
+The snap bundles a slimmed OpenJDK, but one that carries the **full platform module
+set** — so a side-loaded plugin can never fail on a JDK module that was trimmed away.
+Drop your own jars into `$SNAP_COMMON/var/lib/kafka/plugins`:
+
+| Directory  | Loaded by                     | For                                                        |
+| :--------- | :---------------------------- | :--------------------------------------------------------- |
+| `broker/`  | the `server` daemon and tools | broker-side classes: authorizers, metric reporters, tiered storage, custom login modules |
+| `connect/` | Kafka Connect via `plugin.path` | connectors, transforms, converters (one uber-jar or subdirectory per plugin) |
+
+```bash
+sudo cp my-authorizer.jar     /var/snap/kafka/common/var/lib/kafka/plugins/broker/
+sudo cp -r my-connector/      /var/snap/kafka/common/var/lib/kafka/plugins/connect/
+sudo snap restart kafka.server              # or restart the connect app
+```
+
+Plugins are scanned only at start-up, so **restart the affected service** after adding
+one. `connect-distributed` has `plugin.path` seeded to the `connect/` directory already;
+`connect-standalone` takes its own worker config, so point its `plugin.path` at that same
+directory. Side-loaded jars run with the broker's privileges — vetting them is the
+operator's responsibility.
+
 ## Apps
 
 `kafka.server` is the broker daemon (KRaft combined broker + controller in the
@@ -203,8 +227,8 @@ kafka-features                kafka-get-offsets
 | `connect-mirror-maker` | one-shot app    | MirrorMaker 2.                                          |
 | `connect-plugin-path`  | app             | Manage the connector plugin path.                      |
 
-Connector plugins are loaded from `$SNAP_COMMON/var/lib/kafka/plugins`, where they
-can be set manually.
+Connector plugins are loaded from `$SNAP_COMMON/var/lib/kafka/plugins/connect` — see
+[Side-loading plugins and connectors](#side-loading-plugins-and-connectors).
 
 ### Utilities
 

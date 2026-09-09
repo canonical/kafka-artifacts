@@ -25,6 +25,15 @@ BATCH = 200
 DATA_DIR = "/var/snap/kafka/common/var/lib/kafka/data"
 SERVER_PROPS = "/var/snap/kafka/common/etc/kafka/server.properties"
 CLUSTER_ID_FILE = "/var/snap/kafka/common/etc/kafka/cluster.id"
+CONNECT_PROPS = "/var/snap/kafka/common/etc/kafka/connect-distributed.properties"
+
+PLUGIN_BROKER_DIR = "/var/snap/kafka/common/var/lib/kafka/plugins/broker"
+PLUGIN_CONNECT_DIR = "/var/snap/kafka/common/var/lib/kafka/plugins/connect"
+SNAP_LIBS = "/snap/kafka/current/opt/kafka/libs"
+JAVA_BIN = "/snap/kafka/current/usr/lib/jvm/java-slim/bin/java"
+
+# platform modules absent from the pre-A2 trimmed list; a side-loaded plugin could need any of them
+EXPECTED_MODULES = ("jdk.httpserver", "java.net.http", "java.sql.rowset")
 
 IMAGE = os.environ.get("IMAGE", "ubuntu:24.04")
 TYPE = os.environ.get("TYPE", "vm")
@@ -492,3 +501,59 @@ def test_recovers_from_disk_after_restart(cluster: LXDCluster) -> None:
     kafka3.produce(topic=TOPIC, phase="c", count=BATCH)
     got = kafka1.consume_count(topic=TOPIC, want=3 * BATCH)
     assert got >= 3 * BATCH, f"read/write broken after recovery (got {got})"
+
+
+@pytest.mark.run(after="test_recovers_from_disk_after_restart")
+def test_slim_runtime_bundles_full_module_set(cluster: LXDCluster) -> None:
+    """The jlinked runtime carries platform modules the old trimmed list dropped, so a
+    side-loaded plugin cannot fail on a missing (unrecoverable) platform module."""
+    node = cluster.node(name="kafka-1")
+
+    listing = node.run(JAVA_BIN, "--list-modules").stdout
+    present = {line.split("@", 1)[0] for line in listing.splitlines() if line}
+
+    missing = [module for module in EXPECTED_MODULES if module not in present]
+    assert not missing, f"slim runtime is missing platform modules: {missing}"
+
+
+@pytest.mark.run(after="test_slim_runtime_bundles_full_module_set")
+def test_broker_classpath_includes_side_load_dir(cluster: LXDCluster) -> None:
+    """The running broker's classpath carries the broker side-load dir, so jars dropped there
+    are picked up by the daemon (kafka.Kafka is the broker main class)."""
+    node = cluster.node(name="kafka-1")
+
+    cmdline = node.run(
+        "bash",
+        "-c",
+        "tr '\\0' ' ' < /proc/$(pgrep -f kafka.Kafka | head -1)/cmdline",
+    ).stdout
+    assert (
+        PLUGIN_BROKER_DIR in cmdline
+    ), "broker side-load dir not on the broker classpath"
+
+
+@pytest.mark.run(after="test_broker_classpath_includes_side_load_dir")
+def test_connect_plugin_path_is_seeded_and_discovers_a_dropped_connector(
+    cluster: LXDCluster,
+) -> None:
+    """Connect's plugin.path is seeded to the connect side-load dir, and a connector jar placed
+    there is a valid, discoverable plugin (proven with the shipped FileStream connector).
+    """
+    node = cluster.node(name="kafka-1")
+
+    seeded = node.run(
+        "grep", "-Fxq", f"plugin.path={PLUGIN_CONNECT_DIR}", CONNECT_PROPS, check=False
+    )
+    assert seeded.returncode == 0, "install hook did not seed Connect's plugin.path"
+
+    node.run("bash", "-c", f"cp {SNAP_LIBS}/connect-file-*.jar {PLUGIN_CONNECT_DIR}/")
+    dropped = node.run(
+        "bash", "-c", f"ls {PLUGIN_CONNECT_DIR}/connect-file-*.jar"
+    ).stdout.strip()
+
+    listing = node.run(
+        "snap", "run", "kafka.connect-plugin-path", "list", "--plugin-location", dropped
+    ).stdout
+    assert (
+        "FileStreamSource" in listing
+    ), f"connector in the connect side-load dir was not discovered:\n{listing}"
