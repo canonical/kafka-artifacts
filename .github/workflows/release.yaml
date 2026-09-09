@@ -1,6 +1,10 @@
 # Copyright 2026 Canonical Ltd.
 # See LICENSE file for licensing details.
-name: Release to Snap Store
+name: Release to Snap Store edge
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 on:
   push:
@@ -12,17 +16,19 @@ on:
 jobs:
   build:
     name: Build snap
-    uses: canonical/data-platform-workflows/.github/workflows/build_snap.yaml@v32.0.0
+    uses: canonical/data-platform-workflows/.github/workflows/build_snap.yaml@v52.0.0
+    permissions:
+      contents: read
 
   release:
     name: Release snap
     needs:
       - build
-    uses: canonical/data-platform-workflows/.github/workflows/release_snap.yaml@v32.0.0
+    uses: canonical/data-platform-workflows/.github/workflows/release_snap_edge.yaml@v52.0.0
     with:
-      channel: ${{ github.ref_name }}
+      track: '4'
       artifact-prefix: ${{ needs.build.outputs.artifact-prefix }}
     secrets:
-      snap-store-token: ${{ secrets.SNAP_STORE_TOKEN }}
+      snap-store-token: ${{ secrets.SNAP_STORE_TOKEN_EDGE }}
     permissions:
-      contents: write  # Needed to create GitHub release
+      contents: write  # Needed to create git tags

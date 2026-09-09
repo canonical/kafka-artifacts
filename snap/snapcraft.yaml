@@ -19,9 +19,9 @@ lint:
 
 title: Apache Kafka
 website: https://kafka.apache.org
-contact: https://github.com/canonical/kafka-snap/issues
-issues: https://github.com/canonical/kafka-snap/issues
-source-code: https://github.com/canonical/kafka-snap
+contact: https://github.com/canonical/kafka-artifacts/issues
+issues: https://github.com/canonical/kafka-artifacts/issues
+source-code: https://github.com/canonical/kafka-artifacts
 license: Apache-2.0
 
 platforms:
@@ -522,20 +522,8 @@ parts:
       - ca-certificates
     override-build: |
       craftctl default
-      version="$(craftctl get version)"
-      # central-uploader tags releases apache-kafka_2.13-<ver>-ubuntu<N>, each with one .tar.gz; resolve its URL.
-      for patch in ubuntu2 ubuntu1 ubuntu0; do
-        tag="apache-kafka_2.13-${version}-${patch}"
-        api="https://api.github.com/repos/canonical/central-uploader/releases/tags/${tag}"
-        url="$(curl -fsSL "${api}" 2>/dev/null \
-          | grep -oE '"browser_download_url": *"[^"]+\.tar.gz"' \
-          | head -n1 | cut -d'"' -f4 || true)"
-        [ -n "${url}" ] && break
-      done
-      if [ -z "${url}" ]; then
-        echo "no central-uploader release found for Kafka ${version}" >&2
-        exit 1
-      fi
+      # Pinned central-uploader tarball for this Kafka version (asset name carries a build timestamp).
+      url="https://github.com/canonical/central-uploader/releases/download/apache-kafka_2.13-4.3.1-ubuntu0/apache-kafka_2.13-4.3.1-ubuntu0-20260907170210.tar.gz"
       curl -fL -o apache-kafka.tar.gz "${url}"
 
       mkdir -p "${CRAFT_PART_INSTALL}/opt/kafka"

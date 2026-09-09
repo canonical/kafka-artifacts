@@ -46,9 +46,7 @@ jobs:
 
       - name: Connect interfaces
         run: |
-          sudo snap connect kafka:mount-observe || true
-          sudo snap connect kafka:removable-media || true
-          sudo snap connect kafka:home || true
+          just connect-interfaces
 
       - name: Start broker
         run: |
