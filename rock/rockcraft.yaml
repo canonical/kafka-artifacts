@@ -3,14 +3,10 @@ base: ubuntu@26.04
 
 version: '4.3.1'
 
-summary: Rock for Apache Kafka – the distributed event streaming platform
+summary: Apache Kafka as a rock image.
 description: |
-  This rock provides Apache Kafka, a distributed event streaming platform.
-
-  It is built from the same binaries as the kafka snap in this repository.
-  KAFKA_* environment variables are translated into server.properties by
-  kafka.docker.KafkaDockerWrapper, and it runs as an unprivileged appuser
-  account with Kafka installed under /opt/kafka.
+  A standalone rock image for Apache Kafka, a distributed event streaming
+  platform.
 
 license: Apache-2.0
 
@@ -20,17 +16,8 @@ platforms:
 
 environment:
   JAVA_HOME: /opt/java/openjdk
-  # KAFKA_HOME is deliberately absent: KafkaDockerWrapper turns every KAFKA_*
-  # variable in the environment into a server.properties line, so exporting it
-  # here would inject a bogus "home=" and, being a non-empty override, suppress
-  # the shipped default template. The entrypoint keeps /opt/kafka to itself.
-  # Console logging is the container default, so LOG_DIR only holds GC logs; keep
-  # it off the read-only /opt/kafka tree and on a path appuser owns.
   LOG_DIR: /var/log/kafka
   LANG: C.UTF-8
-  # Pebble keeps the output of its services to itself unless it is run with
-  # "--verbose", of which this is the documented environment form. Without it
-  # "docker logs" shows Pebble's own handful of lines and nothing from the broker.
   PEBBLE_VERBOSE: "1"
   PATH: /usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/opt/java/openjdk/bin:/opt/kafka/bin
 
@@ -38,8 +25,6 @@ services:
   kafka:
     override: replace
     startup: enabled
-    # The arguments in brackets become the image's CMD, so "docker run <image>"
-    # starts a broker and "docker run <image> KAFKA_NODE_ID=2" reaches Kafka.
     command: /usr/local/bin/docker-entrypoint.sh [ ]
     user: appuser
     group: appuser
