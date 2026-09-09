@@ -328,7 +328,19 @@ class LXDCluster:
                     node.install_snap(snap="core26")
 
             node.push_file(local=snap_file, remote="/root/kafka.snap")
-            node.install_snap(snap="/root/kafka.snap", dangerous=True)
+
+            # the local install is intermittently rejected while snapd settles after the
+            # base install; retry, and surface snapd's stderr if it never succeeds
+            for attempt in retrying(180):
+                with attempt:
+                    result = node.run(
+                        "snap",
+                        "install",
+                        "/root/kafka.snap",
+                        "--dangerous",
+                        check=False,
+                    )
+                    assert result.returncode == 0, result.stderr
 
     def configure(self) -> None:
         # The server auto-starts and formats a standalone node on install; stop it, wipe that
