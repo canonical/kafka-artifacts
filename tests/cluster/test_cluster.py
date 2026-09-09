@@ -321,7 +321,12 @@ class LXDCluster:
             node.wait_for_snapd()
             node.resolve_ip()
 
-            node.install_snap(snap="core26", check=False)
+            # the base fetch hits the store, so retry it; a swallowed failure here only
+            # resurfaces later as a confusing "kafka.snap install failed" (missing base)
+            for attempt in retrying(180):
+                with attempt:
+                    node.install_snap(snap="core26")
+
             node.push_file(local=snap_file, remote="/root/kafka.snap")
             node.install_snap(snap="/root/kafka.snap", dangerous=True)
 
