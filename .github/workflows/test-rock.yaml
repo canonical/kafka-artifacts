@@ -64,14 +64,16 @@ jobs:
           EOF
           chmod +x "${RUNNER_TEMP}/wait-for-broker.sh"
 
-      # An argument on the "docker run" line is exported as a KAFKA_* override,
-      # so this both starts a single node and checks that the override lands in
-      # the rendered server.properties.
+      # "docker run <rock>" with no KAFKA_* overrides has to boot a working
+      # broker straight from the shipped template, the way "docker run
+      # apache/kafka" does. Passing any KAFKA_* value replaces that template
+      # wholesale, so the override check lives on a cluster node further down
+      # where a complete config is supplied alongside it.
       - name: Start a single node
         run: |
           docker run -d --name kafka -p 9092:9092 \
             -e CLUSTER_ID \
-            kafka:test KAFKA_NUM_PARTITIONS=7
+            kafka:test
 
       - name: Wait for the node to be up
         run: bash "${RUNNER_TEMP}/wait-for-broker.sh" kafka
@@ -91,9 +93,9 @@ jobs:
           echo "${result}"
           echo "${result}" | grep -q hello
 
-      - name: Check the KAFKA_NUM_PARTITIONS argument reached Kafka
+      - name: Check the shipped template rendered the default config
         run: |
-          docker exec kafka grep -q '^num.partitions=7' /opt/kafka/config/server.properties
+          docker exec kafka grep -q '^process.roles=broker,controller' /opt/kafka/config/server.properties
 
       - name: Check the broker's own output reaches docker logs
         run: docker logs kafka 2>&1 | grep -q 'Kafka Server started'
@@ -119,11 +121,16 @@ jobs:
             -e KAFKA_SHARE_COORDINATOR_STATE_TOPIC_MIN_ISR=2
           )
           for id in 1 2 3; do
+            # node 1 also takes a positional CMD argument, which the entrypoint
+            # exports as a KAFKA_* override on top of its complete config; the
+            # rendered value is asserted once the cluster is up.
+            arg=()
+            [ "${id}" = "1" ] && arg=(KAFKA_NUM_PARTITIONS=7)
             docker run -d --name "kafka${id}" --network kafka-net \
               "${common[@]}" \
               -e KAFKA_NODE_ID="${id}" \
               -e KAFKA_ADVERTISED_LISTENERS="PLAINTEXT://kafka${id}:9092" \
-              kafka:test
+              kafka:test "${arg[@]}"
           done
 
       - name: Wait for the cluster to be up
@@ -146,6 +153,10 @@ jobs:
             --timeout-ms 30000 --bootstrap-server kafka3:9092)"
           echo "${result}"
           echo "${result}" | grep -q hello-cluster
+
+      - name: Check the positional-argument override reached Kafka
+        run: |
+          docker exec kafka1 grep -q '^num.partitions=7' /opt/kafka/config/server.properties
 
       - name: Check the topic is replicated across all three nodes
         run: |
