@@ -7,10 +7,10 @@ summary: Rock for Apache Kafka – the distributed event streaming platform
 description: |
   This rock provides Apache Kafka, a distributed event streaming platform.
 
-  It is built from the same binaries as the kafka snap in this repository,
-  and laid out like the official Apache Kafka image: the same paths, the same
-  appuser account, and the same KAFKA_* environment variables translated into
-  server.properties by kafka.docker.KafkaDockerWrapper.
+  It is built from the same binaries as the kafka snap in this repository.
+  KAFKA_* environment variables are translated into server.properties by
+  kafka.docker.KafkaDockerWrapper, and it runs as an unprivileged appuser
+  account with Kafka installed under /opt/kafka.
 
 license: Apache-2.0
 
@@ -60,13 +60,13 @@ checks:
       port: 9092
 
 parts:
-  # The account the official image runs as, with the uid and gid it uses.
+  # The unprivileged account Kafka runs as, at a fixed uid and gid.
   user:
     plugin: nil
     overlay-script: |
-      # ubuntu@26.04 ships a default "ubuntu" user at uid/gid 1000, where the
-      # official image keeps appuser; a data volume shared across an upgrade
-      # needs the two to agree, so reclaim 1000 before creating appuser.
+      # ubuntu@26.04 ships a default "ubuntu" user at uid/gid 1000; appuser has
+      # to own that uid/gid so a data volume shared across an upgrade keeps the
+      # same ownership, so reclaim 1000 before creating appuser.
       userdel --root "${CRAFT_OVERLAY}" --remove ubuntu 2>/dev/null || true
       groupdel --root "${CRAFT_OVERLAY}" ubuntu 2>/dev/null || true
       groupadd --root "${CRAFT_OVERLAY}" -g 1000 appuser
@@ -99,8 +99,7 @@ parts:
       modules="${modules},jdk.security.auth,jdk.security.jgss"
       modules="${modules},jdk.unsupported,jdk.zipfs"
 
-      # /opt/java/openjdk is where the official image keeps its runtime, and
-      # what JAVA_HOME points at above.
+      # /opt/java/openjdk is the runtime location JAVA_HOME points at above.
       jlink \
         --add-modules "${modules}" \
         --strip-debug \
@@ -154,8 +153,8 @@ parts:
       find "${CRAFT_PART_INSTALL}/opt/kafka/bin/" -name '*.sh' -exec chmod a+x {} +
 
       # KafkaDockerWrapper reads the log4j configs from its --default-configs-dir
-      # alongside the server.properties template shipped under rock/local. The
-      # official image seeds them from the distribution's own config the same way.
+      # alongside the server.properties template shipped under rock/local, seeded
+      # here from the distribution's own config.
       mkdir -p "${CRAFT_PART_INSTALL}/etc/kafka/docker"
       cp "${CRAFT_PART_INSTALL}/opt/kafka/config/log4j2.yaml" \
          "${CRAFT_PART_INSTALL}/etc/kafka/docker/log4j2.yaml"

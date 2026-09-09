@@ -1,16 +1,10 @@
 #!/usr/bin/env bash
 #
-# Ported from the official Apache Kafka image, which is the configuration
-# interface anything written against apache/kafka expects: KAFKA_* in the
-# environment, translated into server.properties by
-# kafka.docker.KafkaDockerWrapper, and CLUSTER_ID formatting the KRaft storage
-# on the way up.
-#
-# Combines the upstream run, configureDefaults, configure and (jvm) launch
-# scripts into one entrypoint, dropping the CDS .jsa startup optimisation.
-#
-# https://github.com/apache/kafka/tree/trunk/docker/resources/common-scripts
-# https://github.com/apache/kafka/blob/trunk/docker/jvm/launch
+# The rock's container entrypoint: KAFKA_* variables in the environment are
+# translated into server.properties by kafka.docker.KafkaDockerWrapper, and
+# CLUSTER_ID formats the KRaft storage on the way up, so "docker run <image>"
+# brings up a working single node with no configuration. Arguments on the run
+# line supply further KAFKA_* overrides.
 
 set -o nounset -o errexit
 
@@ -27,9 +21,9 @@ if [ "$#" -ne 0 ]; then
   done
 fi
 
-# The install prefix, matching the official image's hardcoded /opt/kafka. Kept a
-# shell-local rather than an exported KAFKA_HOME, because KafkaDockerWrapper
-# turns every KAFKA_* variable in the environment into a server.properties line.
+# The install prefix. Kept a shell-local rather than an exported KAFKA_HOME,
+# because KafkaDockerWrapper turns every KAFKA_* variable in the environment
+# into a server.properties line.
 KAFKA_HOME=/opt/kafka
 
 # A random-uuid cluster id by default, so "docker run <image>" formats and

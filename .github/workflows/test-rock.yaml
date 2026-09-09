@@ -65,10 +65,10 @@ jobs:
           chmod +x "${RUNNER_TEMP}/wait-for-broker.sh"
 
       # "docker run <rock>" with no KAFKA_* overrides has to boot a working
-      # broker straight from the shipped template, the way "docker run
-      # apache/kafka" does. Passing any KAFKA_* value replaces that template
-      # wholesale, so the override check lives on a cluster node further down
-      # where a complete config is supplied alongside it.
+      # broker straight from the shipped template. Passing any KAFKA_* value
+      # replaces that template wholesale, so the override check lives on a
+      # cluster node further down where a complete config is supplied alongside
+      # it.
       - name: Start a single node
         run: |
           docker run -d --name kafka -p 9092:9092 \
