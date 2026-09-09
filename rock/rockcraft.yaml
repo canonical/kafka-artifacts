@@ -72,21 +72,17 @@ parts:
       - openjdk-21-jdk-headless
       - ca-certificates-java
     override-build: |
-      # A minimal runtime holding only the modules Kafka needs, matching the
-      # module set jlinked into the kafka snap in this repository.
-      modules="java.base,java.compiler,java.desktop,java.instrument"
-      modules="${modules},java.management,java.management.rmi,java.naming"
-      modules="${modules},java.rmi,java.scripting,java.security.jgss"
-      modules="${modules},java.security.sasl,java.sql,java.xml"
-      modules="${modules},jdk.attach,jdk.crypto.cryptoki,jdk.crypto.ec"
-      modules="${modules},jdk.jfr,jdk.management,jdk.management.agent"
-      modules="${modules},jdk.naming.dns,jdk.naming.rmi,jdk.net"
-      modules="${modules},jdk.security.auth,jdk.security.jgss"
-      modules="${modules},jdk.unsupported,jdk.zipfs"
+      # The whole platform module set is kept (not just Kafka's own), matching the runtime
+      # jlinked into the kafka snap in this repository, so side-loaded plugins cannot fail on
+      # a trimmed module: a jlinked image is closed, so a missing module cannot be added back
+      # later. The size win comes from the stripping/compression below and from dropping native
+      # libs, not from dropping modules.
+      jmods="$(dirname "$(dirname "$(readlink -f "$(command -v jlink)")")")/jmods"
 
       # /opt/java/openjdk is the runtime location JAVA_HOME points at above.
       jlink \
-        --add-modules "${modules}" \
+        --module-path "${jmods}" \
+        --add-modules ALL-MODULE-PATH \
         --strip-debug \
         --no-man-pages \
         --no-header-files \
@@ -146,11 +142,14 @@ parts:
       cp "${CRAFT_PART_INSTALL}/opt/kafka/config/tools-log4j2.yaml" \
          "${CRAFT_PART_INSTALL}/etc/kafka/docker/tools-log4j2.yaml"
 
-      # The runtime directories the broker owns: data (log.dirs), GC logs,
-      # TLS material, and the mount point for user-supplied config overrides.
+      # The runtime directories the broker owns: data (log.dirs), GC logs, TLS material,
+      # the mount point for user-supplied config overrides, and the side-load plugin dirs
+      # (broker/ lands on the broker classpath; connect/ is for a user-run Connect worker).
       mkdir -p "${CRAFT_PART_INSTALL}/var/lib/kafka/data" \
                "${CRAFT_PART_INSTALL}/var/log/kafka" \
                "${CRAFT_PART_INSTALL}/etc/kafka/secrets" \
+               "${CRAFT_PART_INSTALL}/var/lib/kafka/plugins/broker" \
+               "${CRAFT_PART_INSTALL}/var/lib/kafka/plugins/connect" \
                "${CRAFT_PART_INSTALL}/mnt/shared/config"
     permissions:
       # KafkaDockerWrapper writes the rendered server.properties back into the
@@ -173,6 +172,14 @@ parts:
         owner: 1000
         group: 1000
         mode: "700"
+      - path: var/lib/kafka/plugins/broker
+        owner: 1000
+        group: 1000
+        mode: "750"
+      - path: var/lib/kafka/plugins/connect
+        owner: 1000
+        group: 1000
+        mode: "750"
       - path: mnt/shared/config
         owner: 1000
         group: 1000

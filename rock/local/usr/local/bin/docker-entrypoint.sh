@@ -59,4 +59,9 @@ if ! result="$("${KAFKA_HOME}/bin/kafka-run-class.sh" kafka.docker.KafkaDockerWr
 fi
 echo "${result}"
 
+# Side-loaded broker plugins: kafka-run-class prepends a pre-set CLASSPATH, so jars dropped in
+# the broker plugin dir load ahead of the core libs; the JVM expands the '/*' wildcard, and an
+# empty dir contributes nothing.
+export CLASSPATH="/var/lib/kafka/plugins/broker/*${CLASSPATH:+:${CLASSPATH}}"
+
 exec "${KAFKA_HOME}/bin/kafka-server-start.sh" "${KAFKA_HOME}/config/server.properties"

@@ -100,6 +100,24 @@ jobs:
       - name: Check the broker's own output reaches docker logs
         run: docker logs kafka 2>&1 | grep -q 'Kafka Server started'
 
+      # The runtime carries the full platform module set, so a side-loaded plugin cannot fail
+      # on a module the old trimmed list dropped (jlinked images are closed).
+      - name: Check the runtime bundles the full module set
+        run: |
+          modules="$(docker exec kafka /opt/java/openjdk/bin/java --list-modules)"
+          for m in jdk.httpserver java.net.http java.sql.rowset; do
+            echo "${modules}" | grep -q "^${m}@" \
+              || { echo "runtime is missing platform module: ${m}" >&2; exit 1; }
+          done
+
+      # Jars dropped in the broker side-load dir are picked up: the entrypoint puts the dir on
+      # the broker's classpath (kafka.Kafka is the broker main class).
+      - name: Check the broker classpath includes the side-load dir
+        run: |
+          cmdline="$(docker exec kafka bash -c 'tr "\0" " " < /proc/$(pgrep -f kafka.Kafka | head -1)/cmdline')"
+          echo "${cmdline}" | grep -q '/var/lib/kafka/plugins/broker' \
+            || { echo "broker side-load dir not on the broker classpath" >&2; exit 1; }
+
       - name: Remove the single node
         run: docker rm --force kafka
 
