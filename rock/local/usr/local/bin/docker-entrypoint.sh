@@ -27,6 +27,11 @@ if [ "$#" -ne 0 ]; then
   done
 fi
 
+# The install prefix, matching the official image's hardcoded /opt/kafka. Kept a
+# shell-local rather than an exported KAFKA_HOME, because KafkaDockerWrapper
+# turns every KAFKA_* variable in the environment into a server.properties line.
+KAFKA_HOME=/opt/kafka
+
 # A random-uuid cluster id by default, so "docker run <image>" formats and
 # starts a working single node without one having to be supplied.
 if [ -z "${CLUSTER_ID:-}" ]; then

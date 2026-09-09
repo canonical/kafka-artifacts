@@ -20,7 +20,10 @@ platforms:
 
 environment:
   JAVA_HOME: /opt/java/openjdk
-  KAFKA_HOME: /opt/kafka
+  # KAFKA_HOME is deliberately absent: KafkaDockerWrapper turns every KAFKA_*
+  # variable in the environment into a server.properties line, so exporting it
+  # here would inject a bogus "home=" and, being a non-empty override, suppress
+  # the shipped default template. The entrypoint keeps /opt/kafka to itself.
   # Console logging is the container default, so LOG_DIR only holds GC logs; keep
   # it off the read-only /opt/kafka tree and on a path appuser owns.
   LOG_DIR: /var/log/kafka
