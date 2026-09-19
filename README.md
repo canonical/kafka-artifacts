@@ -241,14 +241,12 @@ Connector plugins are loaded from `$SNAP_COMMON/var/lib/kafka/plugins/connect` â
 `confinement: strict`, `grade: stable`, `base: core26`, `platforms: [amd64, arm64]`.
 
 Interfaces: `network`, `network-bind`, `mount-observe` on the daemons and tools;
-`removable-media` on the broker (for an external `log.dirs`); `home` on the tools
-(to read client property files / keystores from `$HOME`). `network` and
+`removable-media` on the broker (for an external `log.dirs`). `network` and
 `network-bind` auto-connect; connect the rest if you need them:
 
 ```bash
 sudo snap connect kafka:mount-observe
 sudo snap connect kafka:removable-media
-sudo snap connect kafka:home
 ```
 
 ## Building

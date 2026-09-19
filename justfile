@@ -26,7 +26,6 @@ cluster snap="": test-deps
 connect-interfaces:
     sudo snap connect kafka:mount-observe
     sudo snap connect kafka:removable-media
-    sudo snap connect kafka:home
 
 # Declared as recipe dependencies so "just config smoke" installs them once, not per recipe.
 [private]

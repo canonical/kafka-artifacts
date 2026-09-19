@@ -83,7 +83,6 @@ apps:
       - network
       - network-bind
       - mount-observe
-      - home
     environment:
       bin_script: kafka-acls.sh
   kafka-broker-api-versions:
@@ -94,7 +93,6 @@ apps:
       - network
       - network-bind
       - mount-observe
-      - home
     environment:
       bin_script: kafka-broker-api-versions.sh
   kafka-client-metrics:
@@ -105,7 +103,6 @@ apps:
       - network
       - network-bind
       - mount-observe
-      - home
     environment:
       bin_script: kafka-client-metrics.sh
   kafka-cluster:
@@ -116,7 +113,6 @@ apps:
       - network
       - network-bind
       - mount-observe
-      - home
     environment:
       bin_script: kafka-cluster.sh
   kafka-configs:
@@ -127,7 +123,6 @@ apps:
       - network
       - network-bind
       - mount-observe
-      - home
     environment:
       bin_script: kafka-configs.sh
   kafka-console-consumer:
@@ -138,7 +133,6 @@ apps:
       - network
       - network-bind
       - mount-observe
-      - home
     environment:
       bin_script: kafka-console-consumer.sh
   kafka-console-producer:
@@ -149,7 +143,6 @@ apps:
       - network
       - network-bind
       - mount-observe
-      - home
     environment:
       bin_script: kafka-console-producer.sh
   kafka-consumer-groups:
@@ -160,7 +153,6 @@ apps:
       - network
       - network-bind
       - mount-observe
-      - home
     environment:
       bin_script: kafka-consumer-groups.sh
   kafka-consumer-perf-test:
@@ -171,7 +163,6 @@ apps:
       - network
       - network-bind
       - mount-observe
-      - home
     environment:
       bin_script: kafka-consumer-perf-test.sh
   kafka-delegation-tokens:
@@ -182,7 +173,6 @@ apps:
       - network
       - network-bind
       - mount-observe
-      - home
     environment:
       bin_script: kafka-delegation-tokens.sh
   kafka-delete-records:
@@ -193,7 +183,6 @@ apps:
       - network
       - network-bind
       - mount-observe
-      - home
     environment:
       bin_script: kafka-delete-records.sh
   kafka-dump-log:
@@ -204,7 +193,6 @@ apps:
       - network
       - network-bind
       - mount-observe
-      - home
     environment:
       bin_script: kafka-dump-log.sh
   kafka-e2e-latency:
@@ -215,7 +203,6 @@ apps:
       - network
       - network-bind
       - mount-observe
-      - home
     environment:
       bin_script: kafka-e2e-latency.sh
   kafka-features:
@@ -226,7 +213,6 @@ apps:
       - network
       - network-bind
       - mount-observe
-      - home
     environment:
       bin_script: kafka-features.sh
   kafka-get-offsets:
@@ -237,7 +223,6 @@ apps:
       - network
       - network-bind
       - mount-observe
-      - home
     environment:
       bin_script: kafka-get-offsets.sh
   kafka-jmx:
@@ -248,7 +233,6 @@ apps:
       - network
       - network-bind
       - mount-observe
-      - home
     environment:
       bin_script: kafka-jmx.sh
   kafka-leader-election:
@@ -259,7 +243,6 @@ apps:
       - network
       - network-bind
       - mount-observe
-      - home
     environment:
       bin_script: kafka-leader-election.sh
   kafka-log-dirs:
@@ -270,7 +253,6 @@ apps:
       - network
       - network-bind
       - mount-observe
-      - home
     environment:
       bin_script: kafka-log-dirs.sh
   kafka-metadata-quorum:
@@ -281,7 +263,6 @@ apps:
       - network
       - network-bind
       - mount-observe
-      - home
     environment:
       bin_script: kafka-metadata-quorum.sh
   kafka-metadata-shell:
@@ -292,7 +273,6 @@ apps:
       - network
       - network-bind
       - mount-observe
-      - home
     environment:
       bin_script: kafka-metadata-shell.sh
   kafka-producer-perf-test:
@@ -303,7 +283,6 @@ apps:
       - network
       - network-bind
       - mount-observe
-      - home
     environment:
       bin_script: kafka-producer-perf-test.sh
   kafka-reassign-partitions:
@@ -314,7 +293,6 @@ apps:
       - network
       - network-bind
       - mount-observe
-      - home
     environment:
       bin_script: kafka-reassign-partitions.sh
   kafka-replica-verification:
@@ -325,7 +303,6 @@ apps:
       - network
       - network-bind
       - mount-observe
-      - home
     environment:
       bin_script: kafka-replica-verification.sh
   kafka-run-class:
@@ -336,7 +313,6 @@ apps:
       - network
       - network-bind
       - mount-observe
-      - home
     environment:
       bin_script: kafka-run-class.sh
   kafka-storage:
@@ -347,7 +323,6 @@ apps:
       - network
       - network-bind
       - mount-observe
-      - home
     environment:
       bin_script: kafka-storage.sh
   kafka-streams-application-reset:
@@ -358,7 +333,6 @@ apps:
       - network
       - network-bind
       - mount-observe
-      - home
     environment:
       bin_script: kafka-streams-application-reset.sh
   kafka-topics:
@@ -369,7 +343,6 @@ apps:
       - network
       - network-bind
       - mount-observe
-      - home
     environment:
       bin_script: kafka-topics.sh
   kafka-transactions:
@@ -380,7 +353,6 @@ apps:
       - network
       - network-bind
       - mount-observe
-      - home
     environment:
       bin_script: kafka-transactions.sh
   kafka-verifiable-consumer:
@@ -391,7 +363,6 @@ apps:
       - network
       - network-bind
       - mount-observe
-      - home
     environment:
       bin_script: kafka-verifiable-consumer.sh
   kafka-verifiable-producer:
@@ -402,7 +373,6 @@ apps:
       - network
       - network-bind
       - mount-observe
-      - home
     environment:
       bin_script: kafka-verifiable-producer.sh
   trogdor:
@@ -413,7 +383,6 @@ apps:
       - network
       - network-bind
       - mount-observe
-      - home
     environment:
       bin_script: trogdor.sh
   connect-distributed:
@@ -437,7 +406,6 @@ apps:
       - network
       - network-bind
       - mount-observe
-      - home
     environment:
       bin_script: connect-standalone.sh
   connect-mirror-maker:
@@ -448,7 +416,6 @@ apps:
       - network
       - network-bind
       - mount-observe
-      - home
     environment:
       bin_script: connect-mirror-maker.sh
   connect-plugin-path:
@@ -459,7 +426,6 @@ apps:
       - network
       - network-bind
       - mount-observe
-      - home
     environment:
       bin_script: connect-plugin-path.sh
 
@@ -469,7 +435,6 @@ apps:
     aliases:
       - keytool
     plugs:
-      - home
       - mount-observe
 
 parts:
