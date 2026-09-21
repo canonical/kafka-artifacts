@@ -1,0 +1,5 @@
+summary: the broker answers on localhost:9092, and a topic round-trips messages
+
+execute: |
+  cd "$PROJECT_PATH"
+  just smoke
