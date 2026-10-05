@@ -9,7 +9,7 @@ on:
         default: packed-rock
 
 # The image the cluster is first brought up on, then rolled off of, and a shared
-# cluster id so the rock nodes rejoin the storage the upstream image formatted.
+# cluster id so the rock nodes rejoin the storage the upstream image formatted
 env:
   UPGRADE_FROM_IMAGE: apache/kafka:4.0.0
   CLUSTER_ID: 5L6g3nShT-eMCtK--X86sw
@@ -46,7 +46,7 @@ jobs:
         run: |
           cat > "${RUNNER_TEMP}/wait-for-broker.sh" <<'EOF'
           #!/usr/bin/env bash
-          # Waits for the broker in <container> to answer the protocol on 9092.
+          # Waits for the broker in <container> to answer the protocol on 9092
           set -uo pipefail
           container="$1"
 
@@ -67,7 +67,7 @@ jobs:
           chmod +x "${RUNNER_TEMP}/wait-for-broker.sh"
 
       # Every node is started, and later restarted, through the same call: the
-      # only thing that changes across the upgrade is the image passed to it.
+      # only thing that changes across the upgrade is the image passed to it
       - name: Write the node start helper
         run: |
           cat > "${RUNNER_TEMP}/start-node.sh" <<'EOF'
@@ -126,7 +126,7 @@ jobs:
             --topic upgrade --bootstrap-server kafka1:9092
 
           # Read on a different node, so a message that comes back is one that
-          # was actually replicated rather than one node's local copy.
+          # was actually replicated rather than one node's local copy
           result="$(docker exec kafka3 /opt/kafka/bin/kafka-console-consumer.sh \
             --topic upgrade --from-beginning --max-messages 1 \
             --timeout-ms 30000 --bootstrap-server kafka3:9092)"
@@ -135,7 +135,7 @@ jobs:
 
       # Each node is stopped, removed and restarted under the same name against
       # its own data volume, with the rock replacing the upstream image but every
-      # other flag left exactly as it was at first start.
+      # other flag left exactly as it was at first start
       - name: Roll each node onto the rock
         run: |
           for id in 1 2 3; do

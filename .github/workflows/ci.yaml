@@ -78,7 +78,7 @@ jobs:
       - name: Start broker
         run: |
           sudo snap start kafka.server
-          # The server formats KRaft storage on first start, then answers the protocol; wait for it.
+          # The server formats KRaft storage on first start, then answers the protocol; wait for it
           for _ in $(seq 60); do
             if sudo snap run kafka.kafka-broker-api-versions --bootstrap-server localhost:9092 >/dev/null 2>&1; then
               ready=1
@@ -122,7 +122,7 @@ jobs:
           pattern: ${{ needs.build.outputs.artifact-prefix }}-*
           merge-multiple: true
 
-      # Hosted runners cannot nest KVM, so the 3-node test runs in LXD containers rather than VMs.
+      # Hosted runners cannot nest KVM, so the 3-node test runs in LXD containers rather than VMs
       - name: Set up LXD
         uses: canonical/setup-lxd@main
 
