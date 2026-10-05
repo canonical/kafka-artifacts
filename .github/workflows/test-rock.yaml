@@ -8,7 +8,7 @@ on:
         type: string
         default: packed-rock
 
-# A shared cluster id, so the three combined nodes format the same KRaft cluster.
+# A shared cluster id, so the three combined nodes format the same KRaft cluster
 env:
   CLUSTER_ID: 5L6g3nShT-eMCtK--X86sw
 
@@ -44,7 +44,7 @@ jobs:
         run: |
           cat > "${RUNNER_TEMP}/wait-for-broker.sh" <<'EOF'
           #!/usr/bin/env bash
-          # Waits for the broker in <container> to answer the protocol on 9092.
+          # Waits for the broker in <container> to answer the protocol on 9092
           set -uo pipefail
           container="$1"
 
@@ -68,7 +68,7 @@ jobs:
       # broker straight from the shipped template. Passing any KAFKA_* value
       # replaces that template wholesale, so the override check lives on a
       # cluster node further down where a complete config is supplied alongside
-      # it.
+      # it
       - name: Start a single node
         run: |
           docker run -d --name kafka -p 9092:9092 \
@@ -101,7 +101,7 @@ jobs:
         run: docker logs kafka 2>&1 | grep -q 'Kafka Server started'
 
       # The runtime carries the full platform module set, so a side-loaded plugin cannot fail
-      # on a module the old trimmed list dropped (jlinked images are closed).
+      # on a module the old trimmed list dropped (jlinked images are closed)
       - name: Check the runtime bundles the full module set
         run: |
           modules="$(docker exec kafka /opt/java/openjdk/bin/java --list-modules)"
@@ -110,8 +110,8 @@ jobs:
               || { echo "runtime is missing platform module: ${m}" >&2; exit 1; }
           done
 
-      # Jars dropped in the broker side-load dir are picked up: the entrypoint puts the dir on
-      # the broker's classpath (kafka.Kafka is the broker main class).
+      # Jars dropped in the broker side-load dir are picked up: the start script puts the dir on
+      # the broker's classpath (kafka.Kafka is the broker main class)
       - name: Check the broker classpath includes the side-load dir
         run: |
           cmdline="$(docker exec kafka bash -c 'tr "\0" " " < /proc/$(pgrep -f kafka.Kafka | head -1)/cmdline')"
@@ -139,16 +139,16 @@ jobs:
             -e KAFKA_SHARE_COORDINATOR_STATE_TOPIC_MIN_ISR=2
           )
           for id in 1 2 3; do
-            # node 1 also takes a positional CMD argument, which the entrypoint
-            # exports as a KAFKA_* override on top of its complete config; the
-            # rendered value is asserted once the cluster is up.
-            arg=()
-            [ "${id}" = "1" ] && arg=(KAFKA_NUM_PARTITIONS=7)
+            # node 1 also takes an extra KAFKA_* override on top of its complete
+            # config; the rendered value is asserted once the cluster is up
+            extra=()
+            [ "${id}" = "1" ] && extra=(-e KAFKA_NUM_PARTITIONS=7)
             docker run -d --name "kafka${id}" --network kafka-net \
               "${common[@]}" \
               -e KAFKA_NODE_ID="${id}" \
               -e KAFKA_ADVERTISED_LISTENERS="PLAINTEXT://kafka${id}:9092" \
-              kafka:test "${arg[@]}"
+              "${extra[@]}" \
+              kafka:test
           done
 
       - name: Wait for the cluster to be up
@@ -172,7 +172,7 @@ jobs:
           echo "${result}"
           echo "${result}" | grep -q hello-cluster
 
-      - name: Check the positional-argument override reached Kafka
+      - name: Check the KAFKA_* override reached Kafka
         run: |
           docker exec kafka1 grep -q '^num.partitions=7' /opt/kafka/config/server.properties
 
