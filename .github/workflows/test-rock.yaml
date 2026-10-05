@@ -30,9 +30,11 @@ jobs:
 
       - name: Load the rock into the docker daemon
         run: |
-          rock="$(find . -name '*.rock' -print -quit)"
+          # both arches are downloaded, so pick the rock matching this runner
+          arch="$(dpkg --print-architecture)"
+          rock="$(find . -name "*_${arch}.rock" -print -quit)"
           if [ -z "${rock}" ]; then
-            echo "No .rock file among the downloaded artifacts" >&2
+            echo "No ${arch} .rock file among the downloaded artifacts" >&2
             exit 1
           fi
           echo "Loading ${rock}"
