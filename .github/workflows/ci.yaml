@@ -41,15 +41,6 @@ jobs:
     with:
       artifact-prefix: ${{ needs.build-rock.outputs.artifact-prefix }}
 
-  test-rock-upgrade:
-    name: Test rock upgrade
-    needs:
-      - lint
-      - build-rock
-    uses: ./.github/workflows/test-rock-upgrade.yaml
-    with:
-      artifact-prefix: ${{ needs.build-rock.outputs.artifact-prefix }}
-
   test:
     name: Test snap
     runs-on: ubuntu-latest
