@@ -27,12 +27,10 @@ services:
   kafka:
     override: replace
     startup: enabled
-    command: /usr/local/bin/kafka-start.sh [ ]
+    command: /usr/local/bin/kafka-start.sh
     working-dir: /var/lib/kafka/data
     on-success: shutdown
     on-failure: shutdown
-
-entrypoint-service: kafka
 
 checks:
   broker:
