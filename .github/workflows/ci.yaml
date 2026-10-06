@@ -26,6 +26,21 @@ jobs:
     name: Build snap
     uses: canonical/data-platform-workflows/.github/workflows/build_snap.yaml@v52.0.0
 
+  build-rock:
+    name: Build rock
+    uses: canonical/data-platform-workflows/.github/workflows/build_rock.yaml@v52.0.0
+    with:
+      path-to-rock-directory: rock
+
+  test-rock:
+    name: Test rock
+    needs:
+      - lint
+      - build-rock
+    uses: ./.github/workflows/test-rock.yaml
+    with:
+      artifact-prefix: ${{ needs.build-rock.outputs.artifact-prefix }}
+
   test:
     name: Test snap
     runs-on: ubuntu-latest
@@ -54,7 +69,7 @@ jobs:
       - name: Start broker
         run: |
           sudo snap start kafka.server
-          # The server formats KRaft storage on first start, then answers the protocol; wait for it.
+          # The server formats KRaft storage on first start, then answers the protocol; wait for it
           for _ in $(seq 60); do
             if sudo snap run kafka.kafka-broker-api-versions --bootstrap-server localhost:9092 >/dev/null 2>&1; then
               ready=1
@@ -98,7 +113,7 @@ jobs:
           pattern: ${{ needs.build.outputs.artifact-prefix }}-*
           merge-multiple: true
 
-      # Hosted runners cannot nest KVM, so the 3-node test runs in LXD containers rather than VMs.
+      # Hosted runners cannot nest KVM, so the 3-node test runs in LXD containers rather than VMs
       - name: Set up LXD
         uses: canonical/setup-lxd@main
 
