@@ -45,6 +45,15 @@ parts:
   dependencies:
     plugin: nil
     stage-packages:
+      # the bare base ships no userland, so the pebble start/ready scripts and
+      # the kafka bin/*.sh launchers need a shell and core utilities
+      - bash
+      - coreutils
+      - grep
+      - sed
+      # the jlinked JVM's libjvm.so links libstdc++ and libgcc_s, neither of
+      # which the bare base provides
+      - libstdc++6
       # "free" and "ps", which the kafka start scripts size the heap with
       - procps
       # for kafka clients to verify the certificate of a TLS-enabled broker
