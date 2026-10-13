@@ -1,5 +1,6 @@
 name: kafka
-base: ubuntu@26.04
+base: bare
+build-base: ubuntu@26.04
 
 version: '4.3.1'
 
@@ -7,8 +8,6 @@ summary: Apache Kafka as a rock image.
 description: |
   A standalone rock image for Apache Kafka, a distributed event streaming
   platform.
-
-license: Apache-2.0
 
 platforms:
   amd64:
