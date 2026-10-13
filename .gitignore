@@ -4,6 +4,7 @@ stage
 snap/.snapcraft
 .snapcraft
 *.snap
+*.rock
 *.tgz
 *_source.tar.bz2
 .*.swp
