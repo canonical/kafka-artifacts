@@ -99,7 +99,7 @@ parts:
       - ca-certificates
     override-build: |
       craftctl default
-      url="https://github.com/canonical/central-uploader/releases/download/apache-kafka_2.13-4.3.1-ubuntu0/apache-kafka_2.13-4.3.1-ubuntu0-20260907170210.tar.gz"
+      url="https://github.com/canonical/central-uploader/releases/download/apache-kafka_2.13-4.4.0-ubuntu0/apache-kafka_2.13-4.4.0-ubuntu0-20261110123118.tar.gz"
       curl -fL -o apache-kafka.tar.gz "${url}"
 
       mkdir -p "${CRAFT_PART_INSTALL}/opt/kafka"
