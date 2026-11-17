@@ -2,7 +2,7 @@ name: kafka
 base: bare
 build-base: ubuntu@26.04
 
-version: '4.3.1'
+version: '4.4.0'
 
 summary: Apache Kafka as a rock image.
 description: |
@@ -99,7 +99,7 @@ parts:
       - ca-certificates
     override-build: |
       craftctl default
-      url="https://github.com/canonical/central-uploader/releases/download/apache-kafka_2.13-4.4.0-ubuntu0/apache-kafka_2.13-4.4.0-ubuntu0-20261110123118.tar.gz"
+      url="https://github.com/canonical/central-uploader/releases/download/apache-kafka_2.13-4.4.0-ubuntu1/apache-kafka_2.13-4.4.0-ubuntu1-20261117060923.tar.gz"
       curl -fL -o apache-kafka.tar.gz "${url}"
 
       mkdir -p "${CRAFT_PART_INSTALL}/opt/kafka"
